@@ -1,0 +1,3 @@
+[submodule "patched_cpal"]
+	path = patched_cpal
+	url = git@github.com:RustAudio/cpal.git

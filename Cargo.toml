@@ -1,0 +1,9 @@
+[workspace]
+
+members = [
+    "proj1_acoustic_link",
+    "proj2_multiple_access",
+    "proj3_gateway",
+    "proj4_ftp",
+	"patched_cpal",
+]
