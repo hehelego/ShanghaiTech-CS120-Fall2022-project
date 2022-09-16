@@ -1,3 +1,5 @@
 [submodule "patched_cpal"]
 	path = patched_cpal
 	url = git@github.com:RustAudio/cpal.git
+[submodule "patched_cpal/"]
+	url = git@github.com:hehelego/patched_cpal.git
