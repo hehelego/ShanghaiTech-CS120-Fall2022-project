@@ -8,32 +8,43 @@ use crate::{
     traits::{InStream, OutStream},
 };
 
+/// An input stream built on cpal input stream. Support reading PCM samples.
 pub struct CpalInStream {
     _stream: cpal::Stream,
     buffer: ConcurrentBuffer<f32>,
 }
+/// An output stream built on cpal output stream. Support writing PCM samples.
 pub struct CpalOutStream {
     _stream: cpal::Stream,
     buffer: ConcurrentBuffer<f32>,
 }
+/// A pair of cpal streams, supporting reading and writing PCM samples.
 pub struct CpalStreamPair {
     in_part: CpalInStream,
     out_part: CpalOutStream,
 }
 
 impl CpalInStream {
+    /// create an input stream on a given device with a specified config.
     pub fn new(
         input_device: Device,
         stream_config: StreamConfig,
     ) -> Result<Self, BuildStreamError> {
+        // TODO: build input stream
+        // the callback function should periodically fetch samples
+        // from the stream and push them into the buffer
         todo!();
     }
 }
 impl CpalOutStream {
+    /// create an output stream on a given device with a specified config.
     pub fn new(
         output_device: Device,
         stream_config: StreamConfig,
     ) -> Result<Self, BuildStreamError> {
+        // TODO: build output stream
+        // the callback function should periodically fetch samples
+        // from the buffer and write them into the stream
         todo!();
     }
 }
