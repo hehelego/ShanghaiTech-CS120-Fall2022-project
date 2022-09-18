@@ -706,6 +706,10 @@ dependencies = [
 [[package]]
 name = "proj1_acoustic_link"
 version = "0.1.0"
+dependencies = [
+ "cpal",
+ "hound",
+]
 
 [[package]]
 name = "proj2_multiple_access"
