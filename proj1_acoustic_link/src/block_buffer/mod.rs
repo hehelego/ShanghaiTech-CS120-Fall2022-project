@@ -3,7 +3,7 @@ use std::thread;
 
 pub use buffer::{Buffer, ConcurrentBuffer};
 
-use crate::traits::*;
+use crate::traits::{InStream, OutStream};
 
 impl<T: Clone> InStream<T, ()> for Buffer<T> {
     fn read(&mut self, buf: &mut [T]) -> Result<usize, ()> {
