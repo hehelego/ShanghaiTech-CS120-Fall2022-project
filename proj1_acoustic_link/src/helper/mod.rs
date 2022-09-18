@@ -1,6 +1,7 @@
-/// Generate a linear chirp digital signal.
-/// The instantaneous frequency change from `freq_a` to `freq_b`.
-/// The signal contains exactly `len` samples and the sampling rate is `sample_rate`
+/// Generate a [chirp](https://en.wikipedia.org/wiki/Chirp) digital signal.  
+/// The instantaneous frequency change linearly from `freq_a` to `freq_b`.  
+/// The signal contains exactly `len` samples,
+/// where the sampling rate is `sample_rate` samples per second.
 pub fn chirp(
     freq_a: f32,
     freq_b: f32,
@@ -20,7 +21,8 @@ pub fn chirp(
     })
 }
 
-/// Compute the dot product of two sequences
+/// Compute the dot product of two sequences.  
+/// Panic if the two given sequences have unequal lengths.
 pub fn dot_product<'a, 'b, Ia, Ib>(seq_a: Ia, seq_b: Ib) -> f32
 where
     Ia: ExactSizeIterator<Item = &'a f32>,
@@ -30,7 +32,7 @@ where
     seq_a.zip(seq_b).fold(0.0, |sum, (x, y)| sum + x * y)
 }
 
-/// Copy samples from `src` to fill `dest`.
+/// Copy samples from `src` to fill `dest`.  
 /// Return the number of copied samples.
 pub fn copy<'a, T, D, S>(dest: D, src: S) -> usize
 where
