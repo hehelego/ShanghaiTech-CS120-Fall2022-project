@@ -1,4 +1,6 @@
 mod buffer;
+use std::thread;
+
 pub use buffer::{Buffer, ConcurrentBuffer};
 
 use crate::traits::*;
@@ -37,8 +39,15 @@ impl<T: Clone> InStream<T, ()> for ConcurrentBuffer<T> {
     }
 
     fn read_exact(&mut self, buf: &mut [T]) -> Result<(), ()> {
-        let mut this = self.lock();
-        this.read_exact(buf)
+        let mut n = 0;
+        while n < buf.len() {
+            let mut this = self.lock();
+            if let Ok(m) = this.read(buf) {
+                n += m;
+            }
+            thread::yield_now();
+        }
+        Ok(())
     }
 }
 impl<T: Clone> OutStream<T, ()> for ConcurrentBuffer<T> {

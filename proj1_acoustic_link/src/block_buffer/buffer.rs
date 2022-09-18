@@ -79,7 +79,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 pub struct ConcurrentBuffer<T>(Arc<Mutex<Buffer<T>>>);
 
 impl<T> ConcurrentBuffer<T> {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self(Arc::new(Mutex::new(Buffer::new())))
     }
     pub fn lock(&self) -> MutexGuard<'_, Buffer<T>> {
