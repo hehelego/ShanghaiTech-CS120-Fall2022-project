@@ -1,4 +1,4 @@
-use super::{traits::PhyPacket, Codec, FrameDetector, PhyPacketSender, PreambleGenerator};
+use super::{traits::PhyPacket, Codec, FrameDetector, PreambleGenerator};
 use crate::{
     sample_stream::{SampleInStream, SampleOutStream},
     traits::PacketSender,
@@ -25,7 +25,7 @@ where
     PG: PreambleGenerator,
     CC: Codec,
     FD: FrameDetector,
-    SS: SampleInStream<E>,
+    SS: SampleOutStream<E>,
 {
     pub fn new(stream_in: SS) -> Self {
         let preamble_samples: Vec<_> = PG::generate_preamble().collect();
@@ -45,7 +45,13 @@ where
 
     pub const SAMPLES_PER_PACKET: usize = PG::PREAMBLE_LEN + CC::SAMPLES_PER_PACKET;
 }
-impl<PG, CC, FD, SS, E> PacketSender<PhyPacket, E> for PhySender<PG, CC, FD, SS, E> {
+impl<PG, CC, FD, SS, E> PacketSender<PhyPacket, E> for PhySender<PG, CC, FD, SS, E> 
+where
+    PG: PreambleGenerator,
+    CC: Codec,
+    FD: FrameDetector,
+    SS: SampleInStream<E>,
+{
     fn send(&mut self, packet: PhyPacket) -> Result<(), E> {
         todo!()
     }
