@@ -45,3 +45,13 @@ where
         n + 1
     })
 }
+
+/// bytes to bits. the bits order does not matter.
+pub fn bytes_to_bits(bytes: &[u8]) -> Vec<u8> {
+    todo!()
+}
+/// the reverse process of [`bytes_to_bits`].
+pub fn bits_to_bytes(bits: &[u8]) -> Vec<u8> {
+    assert_eq!(bits.len() % 8, 0);
+    todo!()
+}
