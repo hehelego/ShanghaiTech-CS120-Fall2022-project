@@ -50,7 +50,7 @@ where
     PG: PreambleGenerator,
     CC: Codec,
     FD: FrameDetector,
-    SS: SampleInStream<E>,
+    SS: SampleOutStream<E>,
 {
     fn send(&mut self, packet: PhyPacket) -> Result<(), E> {
         todo!()
