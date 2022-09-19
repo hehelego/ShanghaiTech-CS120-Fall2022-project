@@ -1,7 +1,7 @@
 /// define the traits for physics layer
 pub mod traits;
 pub use traits::{
-    Codec, FrameDetector, PhyPacketReceiver, PhyPacketSender, PhyPacketTxRx, PreambleGenerator,
+  Codec, Frame, FrameDetector, PhyPacket, PhyPacketReceiver, PhyPacketSender, PhyPacketTxRx, PreambleGenerator,
 };
 
 /// implementors of [`FrameDetector`]: audio stream framing algorithms.
@@ -15,4 +15,3 @@ pub mod preambles;
 /// A [`PreambleGenerator`], a [`Codec`] and a [`FrameDetector`] together defines a [`PhyScheme`].  
 /// Implementors of [`PhyPacketSender`], [`PhyPacketReceiver`] and [`PhyPacketTxRx`] are provided.
 pub mod audio_phy_txrx;
-
