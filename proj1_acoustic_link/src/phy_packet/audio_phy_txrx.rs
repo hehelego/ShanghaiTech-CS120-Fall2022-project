@@ -58,5 +58,3 @@ where
 }
 
 // TODO: PHY layer receiver
-
-// TODO: PHY layer sender&receiver
