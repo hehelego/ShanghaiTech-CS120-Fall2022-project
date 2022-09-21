@@ -20,7 +20,3 @@ pub trait OutStream<T, E> {
   /// The function will not return until all the data are written.
   fn write_exact(&mut self, buf: &[T]) -> Result<(), E>;
 }
-
-/// An [`IoStream`] is capable of reading and writing.
-pub trait IoStream<T, E>: InStream<T, E> + OutStream<T, E> {}
-impl<T, E, S> IoStream<T, E> for S where S: InStream<T, E> + OutStream<T, E> {}

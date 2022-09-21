@@ -14,7 +14,3 @@ pub trait PacketReceiver<T, E> {
   /// Implementor should use a separted thread to detect packet.
   fn recv(&mut self) -> Result<T, E>;
 }
-
-/// A TxRx object is capable of reading and writing.
-pub trait PacketTxRx<T, E>: PacketSender<T, E> + PacketReceiver<T, E> {}
-impl<T, E, TxRx> PacketTxRx<T, E> for TxRx where TxRx: PacketSender<T, E> + PacketReceiver<T, E> {}
