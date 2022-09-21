@@ -12,6 +12,6 @@ pub mod modulation;
 pub mod preambles;
 
 /// A systematic implementation of the physisc layer on audio PCM sample streams.  
-/// A [`PreambleGenerator`], a [`Codec`] and a [`FrameDetector`] together defines a [`PhyScheme`].  
+/// A [`PreambleGenerator`], a [`Codec`] and a [`FrameDetector`] together defines a PHY layer.  
 /// Implementors of [`PhyPacketSender`], [`PhyPacketReceiver`] and [`PhyPacketTxRx`] are provided.
 pub mod audio_phy_txrx;
