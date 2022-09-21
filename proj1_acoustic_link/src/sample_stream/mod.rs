@@ -11,6 +11,6 @@ mod iterator_stream;
 /// sample stream IO with a concurrent buffer, read out the written samples
 mod loopback_stream;
 
-pub use cpal_stream::{CpalInStream, CpalOutStream, CpalStreamPair};
+pub use cpal_stream::{CpalInStream, CpalOutStream};
 pub use iterator_stream::{IteratorInStream, IteratorOutStream};
 pub use loopback_stream::LoopBackStream;
