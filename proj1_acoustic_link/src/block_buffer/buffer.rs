@@ -81,29 +81,3 @@ impl<T> Default for Buffer<T> {
     Self::new()
   }
 }
-
-use std::ops::Deref;
-use std::sync::{Arc, Mutex, MutexGuard};
-#[derive(Clone, Debug)]
-/// Thread-safe wrapper of [`Buffer`].  
-/// Implemented with shared memory with mutex lock ([`Arc`] of [`Mutex`]).
-pub struct ConcurrentBuffer<T>(Arc<Mutex<Buffer<T>>>);
-
-impl<T> ConcurrentBuffer<T> {
-  pub fn new() -> Self {
-    Self(Arc::new(Mutex::new(Buffer::new())))
-  }
-}
-impl<T> Deref for ConcurrentBuffer<T> {
-  type Target = <Arc<Mutex<Buffer<T>>> as Deref>::Target;
-
-  fn deref(&self) -> &Self::Target {
-    self.0.deref()
-  }
-}
-
-impl<T> Default for ConcurrentBuffer<T> {
-  fn default() -> Self {
-    Self::new()
-  }
-}
