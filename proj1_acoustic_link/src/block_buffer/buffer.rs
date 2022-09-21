@@ -82,6 +82,7 @@ impl<T> Default for Buffer<T> {
   }
 }
 
+use std::ops::Deref;
 use std::sync::{Arc, Mutex, MutexGuard};
 #[derive(Clone, Debug)]
 /// Thread-safe wrapper of [`Buffer`].  
@@ -92,8 +93,12 @@ impl<T> ConcurrentBuffer<T> {
   pub fn new() -> Self {
     Self(Arc::new(Mutex::new(Buffer::new())))
   }
-  pub fn lock(&self) -> MutexGuard<'_, Buffer<T>> {
-    self.0.lock().expect("ConcurrentBuffer mutex is poisonous")
+}
+impl<T> Deref for ConcurrentBuffer<T> {
+  type Target = <Arc<Mutex<Buffer<T>>> as Deref>::Target;
+
+  fn deref(&self) -> &Self::Target {
+    self.0.deref()
   }
 }
 

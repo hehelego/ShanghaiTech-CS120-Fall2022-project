@@ -34,16 +34,22 @@ impl<T: Clone> OutStream<T, ()> for Buffer<T> {
 
 impl<T: Clone> InStream<T, ()> for ConcurrentBuffer<T> {
   fn read(&mut self, buf: &mut [T]) -> Result<usize, ()> {
-    let mut this = self.lock();
-    this.read(buf)
+    if let Ok(mut this) = self.lock() {
+      this.read(buf)
+    } else {
+      Err(())
+    }
   }
 
   fn read_exact(&mut self, buf: &mut [T]) -> Result<(), ()> {
     let mut n = 0;
     while n < buf.len() {
-      let mut this = self.lock();
-      if let Ok(m) = this.read(buf) {
-        n += m;
+      if let Ok(mut this) = self.lock() {
+        if let Ok(m) = this.read(buf) {
+          n += m;
+        }
+      } else {
+        return Err(());
       }
       thread::yield_now();
     }
@@ -52,12 +58,18 @@ impl<T: Clone> InStream<T, ()> for ConcurrentBuffer<T> {
 }
 impl<T: Clone> OutStream<T, ()> for ConcurrentBuffer<T> {
   fn write(&mut self, buf: &[T]) -> Result<usize, ()> {
-    let mut this = self.lock();
-    this.write(buf)
+    if let Ok(mut this) = self.lock() {
+      this.write(buf)
+    } else {
+      Err(())
+    }
   }
 
   fn write_exact(&mut self, buf: &[T]) -> Result<(), ()> {
-    let mut this = self.lock();
-    this.write_exact(buf)
+    if let Ok(mut this) = self.lock() {
+      this.write_exact(buf)
+    } else {
+      Err(())
+    }
   }
 }
