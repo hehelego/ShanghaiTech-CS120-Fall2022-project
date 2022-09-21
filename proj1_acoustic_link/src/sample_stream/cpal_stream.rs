@@ -30,7 +30,23 @@ impl CpalInStream {
     // TODO: build input stream
     // the callback function should periodically fetch samples
     // from the stream and push them into the buffer
-    todo!();
+    let buffer: ConcurrentBuffer<f32> = Default::default();
+    let bf = buffer.clone();
+    let stream = input_device.build_input_stream(
+      &stream_config,
+      move |data: &[f32], _: &_| CpalInStream::read(data, &bf),
+      |err| eprintln!("An error occured at stream {}", err),
+    )?;
+    Ok(CpalInStream {
+      _stream: stream,
+      buffer,
+    })
+  }
+
+  fn read(data: &[f32], dest: &ConcurrentBuffer<f32>) {
+    if let Ok(mut guard) = dest.lock() {
+      guard.push_slice(data);
+    }
   }
 }
 impl CpalOutStream {
