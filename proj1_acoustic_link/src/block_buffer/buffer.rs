@@ -81,24 +81,3 @@ impl<T> Default for Buffer<T> {
     Self::new()
   }
 }
-
-use std::sync::{Arc, Mutex, MutexGuard};
-#[derive(Clone, Debug)]
-/// Thread-safe wrapper of [`Buffer`].  
-/// Implemented with shared memory with mutex lock ([`Arc`] of [`Mutex`]).
-pub struct ConcurrentBuffer<T>(Arc<Mutex<Buffer<T>>>);
-
-impl<T> ConcurrentBuffer<T> {
-  pub fn new() -> Self {
-    Self(Arc::new(Mutex::new(Buffer::new())))
-  }
-  pub fn lock(&self) -> MutexGuard<'_, Buffer<T>> {
-    self.0.lock().expect("ConcurrentBuffer mutex is poisonous")
-  }
-}
-
-impl<T> Default for ConcurrentBuffer<T> {
-  fn default() -> Self {
-    Self::new()
-  }
-}
