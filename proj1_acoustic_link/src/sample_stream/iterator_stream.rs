@@ -1,14 +1,17 @@
-use crate::traits::{InStream, OutStream};
+use crate::{
+  helper::copy,
+  traits::{InStream, OutStream},
+};
 
 /// A stream object continuously fetch data from an iterator
-pub struct IteratorInStream<I> {
-  iter: I,
-}
+pub struct IteratorInStream<I>(I);
+/// A stream object continuously write data into an iterator
+pub struct IteratorOutStream<I>(I);
 
 impl<I> IteratorInStream<I> {
   /// create a stream from an iterator
   pub fn new(iter: I) -> Self {
-    Self { iter }
+    Self(iter)
   }
 }
 impl<F> IteratorInStream<std::iter::FromFn<F>>
@@ -26,23 +29,18 @@ where
   I: Iterator<Item = f32>,
 {
   fn read(&mut self, buf: &mut [f32]) -> Result<usize, ()> {
-    todo!()
+    Ok(copy(buf.iter_mut(), self.0.by_ref()))
   }
 
   fn read_exact(&mut self, buf: &mut [f32]) -> Result<(), ()> {
-    todo!()
+    self.read(buf).map(|_| ())
   }
-}
-
-/// A stream object continuously write data into an iterator
-pub struct IteratorOutStream<I> {
-  iter: I,
 }
 
 impl<I> IteratorOutStream<I> {
   /// create a stream from an iterator
   pub fn new(iter: I) -> Self {
-    Self { iter }
+    Self(iter)
   }
 }
 impl<'a, F> IteratorOutStream<std::iter::FromFn<F>>
@@ -60,10 +58,10 @@ where
   I: Iterator<Item = &'a mut f32>,
 {
   fn write(&mut self, buf: &[f32]) -> Result<usize, ()> {
-    todo!()
+    Ok(copy(self.0.by_ref(), buf.iter().cloned()))
   }
 
   fn write_exact(&mut self, buf: &[f32]) -> Result<(), ()> {
-    todo!()
+    self.write(buf).map(|_| ())
   }
 }
