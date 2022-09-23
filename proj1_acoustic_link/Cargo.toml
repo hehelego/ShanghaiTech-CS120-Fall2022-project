@@ -10,3 +10,8 @@ rand = "0.8"
 [dependencies]
 cpal = {path = "../patched_cpal/"}
 hound = "3.5"
+
+# using air-gapped transmission or wired transmission
+[features]
+default = []
+wired = []
