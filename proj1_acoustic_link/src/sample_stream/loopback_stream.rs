@@ -5,6 +5,7 @@ use crate::{
 
 /// A loopback streae.
 /// The stream can read out whatever written into it.
+#[derive(Clone)]
 pub struct LoopBackStream(ConcurrentBuffer<f32>);
 
 impl LoopBackStream {
