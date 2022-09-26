@@ -23,8 +23,7 @@ impl<R: Read> InStream<f32, WavError> for HoundInStream<R> {
   fn read(&mut self, buf: &mut [f32]) -> Result<usize, WavError> {
     let mut n = 0;
     for (x, sample) in buf.iter_mut().zip(self.0.samples()) {
-      let sample = sample?;
-      *x = sample;
+      *x = sample?;
       n += 1;
     }
     Ok(n)
