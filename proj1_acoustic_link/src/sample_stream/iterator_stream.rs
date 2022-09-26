@@ -1,14 +1,13 @@
-use crate::traits::{InStream, OutStream};
+use crate::{helper::copy, traits::InStream};
 
-/// A stream object continuously fetch data from an iterator
-pub struct IteratorInStream<I> {
-  iter: I,
-}
+/// A stream object continuously fetch data from an iterator.  
+/// Majorly used for testing.
+pub struct IteratorInStream<I>(I);
 
 impl<I> IteratorInStream<I> {
   /// create a stream from an iterator
   pub fn new(iter: I) -> Self {
-    Self { iter }
+    Self(iter)
   }
 }
 impl<F> IteratorInStream<std::iter::FromFn<F>>
@@ -26,44 +25,10 @@ where
   I: Iterator<Item = f32>,
 {
   fn read(&mut self, buf: &mut [f32]) -> Result<usize, ()> {
-    todo!()
+    Ok(copy(buf.iter_mut(), self.0.by_ref()))
   }
 
   fn read_exact(&mut self, buf: &mut [f32]) -> Result<(), ()> {
-    todo!()
-  }
-}
-
-/// A stream object continuously write data into an iterator
-pub struct IteratorOutStream<I> {
-  iter: I,
-}
-
-impl<I> IteratorOutStream<I> {
-  /// create a stream from an iterator
-  pub fn new(iter: I) -> Self {
-    Self { iter }
-  }
-}
-impl<'a, F> IteratorOutStream<std::iter::FromFn<F>>
-where
-  F: FnMut() -> Option<&'a mut f32>,
-{
-  /// create a input stream from a function that can generate f32 mutable reference
-  pub fn from_fn(func: F) -> Self {
-    Self::new(std::iter::from_fn(func))
-  }
-}
-
-impl<'a, I> OutStream<f32, ()> for IteratorOutStream<I>
-where
-  I: Iterator<Item = &'a mut f32>,
-{
-  fn write(&mut self, buf: &[f32]) -> Result<usize, ()> {
-    todo!()
-  }
-
-  fn write_exact(&mut self, buf: &[f32]) -> Result<(), ()> {
-    todo!()
+    self.read(buf).map(|_| ())
   }
 }

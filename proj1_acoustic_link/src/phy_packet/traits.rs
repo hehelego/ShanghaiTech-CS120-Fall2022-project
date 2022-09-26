@@ -1,4 +1,4 @@
-use crate::traits::{PacketReceiver, PacketSender, PacketTxRx};
+use crate::traits::{PacketReceiver, PacketSender};
 
 /// packet sender types that can send [`PhyPacket`]
 pub trait PhyPacketSender<E>: PacketSender<PhyPacket, E> {}
@@ -7,10 +7,6 @@ impl<PS, E> PhyPacketSender<E> for PS where PS: PacketSender<PhyPacket, E> {}
 /// packet receiver types that can receive [`PhyPacket`]
 pub trait PhyPacketReceiver<E>: PacketReceiver<PhyPacket, E> {}
 impl<PR, E> PhyPacketReceiver<E> for PR where PR: PacketReceiver<PhyPacket, E> {}
-
-/// packet_txrx types that can transmit/receive [`PhyPacket`]
-pub trait PhyPacketTxRx<E>: PacketTxRx<PhyPacket, E> {}
-impl<TXRX, E> PhyPacketTxRx<E> for TXRX where TXRX: PacketTxRx<PhyPacket, E> {}
 
 /// A [`PhyPacket`] is a packet of data in the physics layer
 pub type PhyPacket = Vec<u8>;
