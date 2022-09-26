@@ -7,6 +7,10 @@ enum FramingState {
   WaitPayload,
 }
 
+/// Correlation Preamble Detection Algorithm: correlation sequence falling edge.  
+/// credit: [Open OFDM docs: detection](https://openofdm.readthedocs.io/en/latest/detection.html).  
+/// See also: `SamplePHY.m` provided by Prof. Zhice Yang.
+///
 /// If a preamble exists, the correlation pattern is:
 /// 1. first goes up quickly when the preamble starts
 /// 2. stay at plateau for a while
