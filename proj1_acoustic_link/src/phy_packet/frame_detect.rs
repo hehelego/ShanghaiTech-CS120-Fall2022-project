@@ -72,7 +72,7 @@ impl CorrelationFraming {
       self.detect_window.iter_mut().for_each(|x| *x = 0.0);
       self.detect_sqr_sum = 0.0;
 
-      let frame_samples = self.stream_range(self.peak_index + 1, self.index);
+      let frame_samples = self.stream_range(self.peak_index + 1, self.index + 1);
       self.frame_window.extend(frame_samples);
 
       // reset correlation max and argmax
@@ -135,7 +135,7 @@ impl FrameDetector for CorrelationFraming {
       preamble_norm: sqr_sum.sqrt(),
       state: FramingState::DetectPreamble,
       index: 0,
-      stream_head: 0,
+      stream_head: 1,
       power: sqr_sum / m as f32,
       peak_value: 0.0,
       peak_index: 0,
