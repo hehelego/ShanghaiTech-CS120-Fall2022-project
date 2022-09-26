@@ -1,4 +1,4 @@
-use crate::{
+use proj1_acoustic_link::{
   sample_stream::{CpalInStream, CpalOutStream},
   traits::{InStream, OutStream},
 };
