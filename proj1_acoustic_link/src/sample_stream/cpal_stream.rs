@@ -9,13 +9,13 @@ use crate::{
 };
 
 /// An input stream built on cpal input stream. Support reading PCM samples.
-/// The `CpalInStream` fetch samples from the `cpal::Stream`
+/// The `CpalInStream` fetch samples from a `cpal::Stream`
 pub struct CpalInStream {
   stream: cpal::Stream,
   buffer: ConcurrentBuffer<f32>,
 }
 /// An output stream built on cpal output stream. Support writing PCM samples.
-/// The `CpalOutStream` write samples to the `cpal::Stream`
+/// The `CpalOutStream` write samples to a `cpal::Stream`
 pub struct CpalOutStream {
   stream: cpal::Stream,
   buffer: ConcurrentBuffer<f32>,
@@ -23,7 +23,7 @@ pub struct CpalOutStream {
 
 impl CpalInStream {
   /// Create an input stream on a given device with a specified config.
-  /// The stream is ninitially in playing state.
+  /// The stream is initially in playing state.
   pub fn new(input_device: Device, stream_config: StreamConfig) -> Result<Self, BuildStreamError> {
     // the callback function  periodically fetch samples
     // from the stream and push them into the buffer
@@ -40,7 +40,7 @@ impl CpalInStream {
   pub fn play(&self) {
     self.stream.play().unwrap();
   }
-  /// Pause the stream. All the samples come in when stream is paused will be descard silently.
+  /// Pause the stream. All the samples come in when stream is paused will be discarded silently.
   pub fn pause(&self) {
     self.stream.pause().unwrap();
   }
@@ -52,7 +52,7 @@ impl CpalInStream {
 
 impl CpalOutStream {
   /// create an output stream on a given device with a specified config.
-  /// The stream is ninitially in playing state.
+  /// The stream is initially in playing state.
   pub fn new(output_device: Device, stream_config: StreamConfig) -> Result<Self, BuildStreamError> {
     // the callback function should periodically fetch samples
     // from the buffer and write them into the stream
