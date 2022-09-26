@@ -16,21 +16,26 @@ enum FramingState {
 /// 2. stay at plateau for a while
 /// 3. reduce quickly after the preamble ends
 /// Our approach is to detect **the falling edge**
+///
+/// Another necessary condition is that the waveform
+/// bears enough similarity with the preamble sequence.  
+/// We test whether the cosine-similarity is greater than [`CorrelationFraming::COSINE_MIN`]
 pub struct CorrelationFraming {
-  preamble_len: usize,
-  payload_len: usize,
-  preamble: Vec<f32>,
-  preamble_norm: f32,
-  state: FramingState,
-  index: usize,
-  stream_head: usize,
-  power: f32,
-  peak_value: f32,
-  peak_index: usize,
-  detect_window: VecDeque<f32>,
-  detect_sqr_sum: f32,
-  frame_window: VecDeque<f32>,
-  stream_window: VecDeque<f32>,
+  preamble_len: usize,           // number of samples in the preamble sequence
+  payload_len: usize,            // number of samples in the payload section
+  preamble: Vec<f32>,            // preamble sample sequence
+  preamble_norm: f32,            // norm of the preamble vector: square root of the square sum of preamble samples
+  state: FramingState,           // current working state of the frame detector: either
+  index: usize,                  // the index of the incomming sample: 1-based indexing
+  stream_head: usize,            // the index of the first sample in the stream buffer
+  power: f32,                    // smoothed input signal power
+  peak_value: f32,               // maximum value of the correlation
+  peak_index: usize,             // the sample index when the correlation peak value is found
+  detect_window: VecDeque<f32>,  // a sliding window containg the possible preamble section.
+  detect_sqr_sum: f32,           // the square sum of the samples in the detect window
+  payload_window: VecDeque<f32>, // the samples in the payload section of a frame.
+  // used only when a preamble is detected.
+  stream_window: VecDeque<f32>, // the stream buffer, used to preserve the input sample sequence
 }
 
 impl CorrelationFraming {
@@ -47,55 +52,80 @@ impl CorrelationFraming {
   /// The falling edge can be detected about 200 samples after the correlation peak appears.
   pub const AFTER_PEAK_SAMPLES: usize = 200;
 
+  /// Extract the samples whose index falls in [start, end-1], pack then into a vector.
   fn stream_range(&self, start: usize, end: usize) -> Vec<f32> {
+    // the sample on the stream buffer head has index `self.stream_head`
     let offset = self.stream_head;
+    // compute the range in the stream buffer
     let start = start - offset;
     let end = end - offset;
+    // clone the samples in the range
     self.stream_window.range(start..end).cloned().collect()
   }
-  // stop when the Cosine-Similarity of detect window and the preamble is greater than a threshold
+
+  /// The actions and state-transitions to do when the frame detector state is `DetectPreamble`.
   fn iter_detect_preamble(&mut self, sample: f32) -> FramingState {
     // update the preamble detect window
     let head = self.detect_window.pop_front().unwrap();
     self.detect_window.push_back(sample);
     self.detect_sqr_sum += sample * sample - head * head;
 
-    // compute the correlation
+    // compute the dot product, correlation and cosine-similarity
     let dot = dot_product(self.detect_window.iter(), self.preamble.iter());
     let corr2pwr = (dot / self.preamble_len as f32) / self.power;
     let cosine_sim = dot / self.preamble_norm / self.detect_sqr_sum.sqrt();
 
-    // - max correlation: end of the preamble sequence
-    // - correlation drops down: payload section begins
+    // the three possible branches:
+    // - max correlation index: end of the preamble sequence
+    // - correlation falling edge: preamble ends and payload begins
     // - otherwise: skip
     if corr2pwr > Self::CORR_TO_PWR_MIN.max(self.peak_value) && cosine_sim > Self::COSINE_MIN {
+      // entering the correlation plateau phase
+
       self.peak_value = corr2pwr;
       self.peak_index = self.index;
+      // next: wait for falling edge
       FramingState::DetectPreamble
     } else if self.index - self.peak_index > Self::AFTER_PEAK_SAMPLES && self.peak_index != 0 {
+      // find the correlation falling edge, a preamble is detected
+
+      // clear the preamble detect window
       self.detect_window.iter_mut().for_each(|x| *x = 0.0);
       self.detect_sqr_sum = 0.0;
 
+      // samples after the correlation peak and the correlation falling edge
+      // are the beginning samples of the payload section.
+      // push them into the payload window.
       let frame_samples = self.stream_range(self.peak_index + 1, self.index + 1);
-      self.frame_window.extend(frame_samples);
+      self.payload_window.extend(frame_samples);
 
-      // reset correlation max and argmax
+      // reset correlation peak value and peak index
       self.peak_value = 0.0;
       self.peak_index = 0;
 
+      // the preamble is found.
+      // next: wait for the payload section.
       FramingState::WaitPayload
     } else {
+      // otherwise, try to detect the preamble at the next position
       FramingState::DetectPreamble
     }
   }
-  fn iter_wait_frame(&mut self, sample: f32) -> (FramingState, Option<Frame>) {
-    assert!(self.frame_window.len() < self.payload_len);
-    self.frame_window.push_back(sample);
+  /// The actions and state-transitions to do when the frame detector state is `WaitPayload`.
+  fn iter_wait_payload(&mut self, sample: f32) -> (FramingState, Option<Frame>) {
+    assert!(self.payload_window.len() < self.payload_len);
+
+    // append the newly found sample into the payload window
+    self.payload_window.push_back(sample);
     // wait until we have enough example
-    if self.frame_window.len() == self.payload_len {
-      let frame = self.frame_window.drain(..).collect();
+    if self.payload_window.len() == self.payload_len {
+      // extract the payload section, clear the payload window.
+      let frame = self.payload_window.drain(..).collect();
+      // we have extracted a whole frame,
+      // next: try to detect another frame
       (FramingState::DetectPreamble, Some(frame))
     } else {
+      // no enough samples, continue to wait for more samples.
       (FramingState::WaitPayload, None)
     }
   }
@@ -120,7 +150,7 @@ impl FrameDetector for CorrelationFraming {
         None
       }
       FramingState::WaitPayload => {
-        let (st, frame) = self.iter_wait_frame(sample);
+        let (st, frame) = self.iter_wait_payload(sample);
         self.state = st;
         // the possible found frame
         frame
@@ -145,7 +175,7 @@ impl FrameDetector for CorrelationFraming {
       peak_index: 0,
       detect_window: std::iter::repeat(0.0).take(m).collect(),
       detect_sqr_sum: 0.0,
-      frame_window: VecDeque::with_capacity(n),
+      payload_window: VecDeque::with_capacity(n),
       stream_window: VecDeque::with_capacity(n * 2 + 1),
     }
   }
