@@ -1,6 +1,6 @@
 /// type trait alias
 mod traits;
-pub use traits::{SampleInStream,  SampleOutStream};
+pub use traits::{SampleInStream, SampleOutStream};
 
 /// sample stream IO with cpal audio I/O
 mod cpal_stream;
@@ -13,5 +13,5 @@ mod loopback_stream;
 
 pub use cpal_stream::{CpalInStream, CpalOutStream};
 pub use hound_stream::{HoundInStream, HoundOutStream};
-pub use iterator_stream::{IteratorInStream, IteratorOutStream};
+pub use iterator_stream::IteratorInStream;
 pub use loopback_stream::LoopBackStream;
