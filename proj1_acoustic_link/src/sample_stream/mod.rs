@@ -14,3 +14,6 @@ mod loopback_stream;
 pub use cpal_stream::{CpalInStream, CpalOutStream};
 pub use iterator_stream::{IteratorInStream, IteratorOutStream};
 pub use loopback_stream::LoopBackStream;
+
+#[cfg(test)]
+mod tests;
