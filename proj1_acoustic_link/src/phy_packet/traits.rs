@@ -48,9 +48,14 @@ pub trait Codec {
 
 /// type traits for frame detector strategy
 pub trait FrameDetector {
-  /// update the detector state when a new sample is received
+  /// Update the detector state when a new sample is received.  
+  /// Return a frame of samples if we detect any.
   fn update(&mut self, sample: f32) -> Option<Vec<f32>>;
 
-  /// create a frame detector
+  /// Create a frame detector.  
+  /// To create a frame detector,
+  /// the preamble sequence to detect and
+  /// the length of the payload section of a frame
+  /// should be given.
   fn new(preamble_samples: Vec<f32>, payload_samples: usize) -> Self;
 }
