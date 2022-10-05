@@ -1,22 +1,6 @@
 use crate::helper::chirp;
 
-use super::PreambleGenerator;
-
-use std::iter;
-
-type ITER = std::vec::IntoIter<f32>;
-
-/// an empty preamble sequence
-pub struct Empty;
-impl PreambleGenerator for Empty {
-  type PreambleSequence = iter::Empty<f32>;
-
-  const PREAMBLE_LEN: usize = 0;
-
-  fn generate_preamble() -> Self::PreambleSequence {
-    iter::empty()
-  }
-}
+use super::PreambleGen;
 
 /// an chirp signal preamble sequence, the frequency goes up then down.  
 /// **NOTE** Due to lack of rustc features, the following parameters are not configurable.  
@@ -33,18 +17,15 @@ impl ChirpUpDown {
   pub const FS: usize = 48000;
 }
 
-impl PreambleGenerator for ChirpUpDown {
-  type PreambleSequence = ITER;
-
+impl PreambleGen for ChirpUpDown {
   const PREAMBLE_LEN: usize = ChirpUpDown::N;
 
-  fn generate_preamble() -> Self::PreambleSequence {
+  fn generate() -> Vec<f32> {
     let fa = ChirpUpDown::FA;
     let fb = ChirpUpDown::FB;
     let m = ChirpUpDown::N / 2;
     let fs = ChirpUpDown::FS;
 
-    let data: Vec<_> = chirp(fa, fb, m, fs).chain(chirp(fb, fa, m, fs)).collect();
-    data.into_iter()
+    chirp(fa, fb, m, fs).chain(chirp(fb, fa, m, fs)).collect()
   }
 }

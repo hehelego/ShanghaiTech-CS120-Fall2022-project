@@ -1,4 +1,4 @@
-use super::{traits::PhyPacket, Codec, Frame, FrameDetector, PreambleGenerator};
+use super::{traits::BytesPacket, Codec, FrameDetector, FramePayload, PreambleGen};
 use crate::{
   sample_stream::{SampleInStream, SampleOutStream},
   traits::{PacketReceiver, PacketSender},
@@ -19,34 +19,32 @@ pub struct PhySender<PG, CC, SS, E> {
   _err: PhantomData<E>,
   preamble_samples: Vec<f32>,
   codec: CC,
-  sample_stream: SS,
+  stream_out: SS,
 }
 
 impl<PG, CC, SS, E> PhySender<PG, CC, SS, E>
 where
-  PG: PreambleGenerator,
+  PG: PreambleGen,
   CC: Codec,
   SS: SampleOutStream<E>,
 {
-  pub fn new(stream_in: SS) -> Self {
-    let preamble_samples: Vec<_> = PG::generate_preamble().collect();
-    let codec = CC::new();
-    let sample_stream = stream_in;
+  pub fn new(stream_out: SS, codec: CC) -> Self {
+    let preamble_samples = PG::generate();
 
     Self {
       _pg: PhantomData::default(),
       _err: PhantomData::default(),
       preamble_samples,
       codec,
-      sample_stream,
+      stream_out,
     }
   }
 
   pub const SAMPLES_PER_PACKET: usize = PG::PREAMBLE_LEN + CC::SAMPLES_PER_PACKET;
 }
-impl<PG, CC, SS, E> PacketSender<PhyPacket, E> for PhySender<PG, CC, SS, E>
+impl<PG, CC, SS, E> PacketSender<BytesPacket, E> for PhySender<PG, CC, SS, E>
 where
-  PG: PreambleGenerator,
+  PG: PreambleGen,
   CC: Codec,
   SS: SampleOutStream<E>,
 {
@@ -55,7 +53,7 @@ where
   /// - preamble: predefined samples
   /// - payload: output of modulation on packet bytes
   /// NOTE: write them to the underlying stream together with `write_once`
-  fn send(&mut self, packet: PhyPacket) -> Result<(), E> {
+  fn send(&mut self, packet: BytesPacket) -> Result<(), E> {
     todo!()
   }
 }
@@ -72,14 +70,14 @@ pub struct PhyReceiver<PG, CC, FD, SS, E> {
   _ss: PhantomData<SS>,
   _err: PhantomData<E>,
   codec: CC,
-  frame_rx: Receiver<Frame>,
+  frame_rx: Receiver<FramePayload>,
   exit_tx: Sender<()>,
   handler: Option<JoinHandle<()>>,
 }
 
 impl<PG, CC, FD, SS, E> PhyReceiver<PG, CC, FD, SS, E>
 where
-  PG: PreambleGenerator,
+  PG: PreambleGen,
   CC: Codec,
   FD: FrameDetector,
   SS: SampleInStream<E>,
@@ -93,21 +91,21 @@ where
     todo!();
   }
 
-  pub fn new(stream_in: SS) -> Self {
+  pub fn new(stream_in: SS, codec: CC, frame_detector: FD) -> Self {
     // create worker, transfer data
     todo!()
   }
 }
 
-impl<PG, CC, FD, SS, E> PacketReceiver<PhyPacket, E> for PhyReceiver<PG, CC, FD, SS, E>
+impl<PG, CC, FD, SS, E> PacketReceiver<BytesPacket, E> for PhyReceiver<PG, CC, FD, SS, E>
 where
-  PG: PreambleGenerator,
+  PG: PreambleGen,
   CC: Codec,
   FD: FrameDetector,
   SS: SampleInStream<E>,
 {
   // receive frame from the channel and then demodulate the signal
-  fn recv(&mut self) -> Result<PhyPacket, E> {
+  fn recv(&mut self) -> Result<BytesPacket, E> {
     todo!()
   }
 }
