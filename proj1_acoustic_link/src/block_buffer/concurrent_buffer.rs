@@ -13,6 +13,12 @@ impl<T> ConcurrentBuffer<T> {
   pub fn new() -> Self {
     Self(Arc::new(Mutex::new(Buffer::new())))
   }
+
+  /// Clear the buffer
+  pub fn clear(&self) {
+    let mut this = self.0.lock().unwrap();
+    this.clear()
+  }
 }
 
 impl<T> Default for ConcurrentBuffer<T> {
