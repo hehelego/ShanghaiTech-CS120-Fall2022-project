@@ -45,6 +45,7 @@ impl CpalInStream {
   pub fn pause(&self) {
     self.stream.pause().unwrap();
   }
+
   // the helper function passed to the `stream.build_input_stream`
   fn read_from_stream(data: &[f32], dest: &mut ConcurrentBuffer<f32>) {
     dest.write(data).unwrap();
@@ -76,6 +77,11 @@ impl CpalOutStream {
   pub fn pause(&self) {
     self.stream.pause().unwrap();
   }
+  /// Clear the samples not played.
+  pub fn clear(&self) {
+    self.buffer.clear()
+  }
+
   // helper function passed to the `stream.build_output_stream`
   fn write_to_stream(data: &mut [f32], src: &mut ConcurrentBuffer<f32>) {
     let read_size = src.read(data).unwrap();
@@ -94,7 +100,7 @@ impl Default for CpalInStream {
     let stream_config = StreamConfig {
       channels: defaut_config::CHANNELS,
       sample_rate: cpal::SampleRate(defaut_config::SAMPLE_RATE),
-      buffer_size: cpal::BufferSize::Fixed(defaut_config::BUFFER_SIZE),
+      buffer_size: cpal::BufferSize::Fixed(defaut_config::BUFFER_SIZE as u32),
     };
     Self::new(input_device, stream_config).expect("failed to create input stream")
   }
@@ -126,7 +132,7 @@ impl Default for CpalOutStream {
     let stream_config = StreamConfig {
       channels: defaut_config::CHANNELS,
       sample_rate: cpal::SampleRate(defaut_config::SAMPLE_RATE),
-      buffer_size: cpal::BufferSize::Fixed(defaut_config::BUFFER_SIZE),
+      buffer_size: cpal::BufferSize::Fixed(defaut_config::BUFFER_SIZE as u32),
     };
     Self::new(output_device, stream_config).expect("failed to create input stream")
   }
