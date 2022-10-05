@@ -5,8 +5,8 @@ use cpal::{
 
 use crate::{
   block_buffer::ConcurrentBuffer,
-  defaut_config,
   traits::{InStream, OutStream},
+  DefaultConfig,
 };
 
 /// An input stream built on cpal input stream. Support reading PCM samples.
@@ -97,11 +97,7 @@ impl Default for CpalInStream {
   fn default() -> Self {
     let host = cpal::default_host();
     let input_device = host.default_input_device().expect("no default input device available");
-    let stream_config = StreamConfig {
-      channels: defaut_config::CHANNELS,
-      sample_rate: cpal::SampleRate(defaut_config::SAMPLE_RATE),
-      buffer_size: cpal::BufferSize::Fixed(defaut_config::BUFFER_SIZE as u32),
-    };
+    let stream_config = DefaultConfig::new();
     Self::new(input_device, stream_config).expect("failed to create input stream")
   }
 }
@@ -129,11 +125,7 @@ impl Default for CpalOutStream {
     let output_device = host
       .default_output_device()
       .expect("no default output device available");
-    let stream_config = StreamConfig {
-      channels: defaut_config::CHANNELS,
-      sample_rate: cpal::SampleRate(defaut_config::SAMPLE_RATE),
-      buffer_size: cpal::BufferSize::Fixed(defaut_config::BUFFER_SIZE as u32),
-    };
+    let stream_config = DefaultConfig::new();
     Self::new(output_device, stream_config).expect("failed to create input stream")
   }
 }

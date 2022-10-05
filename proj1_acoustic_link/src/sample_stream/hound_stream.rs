@@ -7,8 +7,8 @@ use std::{
 use hound::{Error as WavError, WavReader, WavWriter};
 
 use crate::{
-  defaut_config,
   traits::{InStream, OutStream},
+  DefaultConfig,
 };
 
 pub struct HoundInStream<R: Read>(WavReader<R>);
@@ -43,12 +43,7 @@ impl HoundOutStream<BufWriter<File>> {
   where
     P: AsRef<Path>,
   {
-    let spec = hound::WavSpec {
-      channels: defaut_config::CHANNELS,
-      sample_rate: defaut_config::SAMPLE_RATE,
-      bits_per_sample: defaut_config::BITS_PER_SAMPE,
-      sample_format: hound::SampleFormat::Float,
-    };
+    let spec = DefaultConfig::new();
     HoundOutStream::new(hound::WavWriter::create(filename, spec).unwrap())
   }
 }
