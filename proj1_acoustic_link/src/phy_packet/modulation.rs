@@ -1,6 +1,6 @@
 use crate::helper::{bits_to_bytes, bytes_to_bits, dot_product};
 
-use super::{Codec, Frame, PhyPacket};
+use super::{BytesPacket, Codec, FramePayload};
 
 // TODO: PSK
 /// PSK (phase shift keying)  
@@ -25,17 +25,17 @@ impl Codec for PSK {
 
   const SAMPLES_PER_PACKET: usize = PSK::SAMPLES_PER_SYMBOL * PSK::SYMBOLS_PER_PACKET;
 
-  fn encode(&mut self, bytes: &[u8]) -> Frame {
+  fn encode(&mut self, bytes: &[u8]) -> FramePayload {
     assert_eq!(bytes.len(), Self::BYTES_PER_PACKET);
 
-    let mut frame = Frame::with_capacity(Self::SAMPLES_PER_SYMBOL);
+    let mut frame = FramePayload::with_capacity(Self::SAMPLES_PER_SYMBOL);
     bytes_to_bits(bytes)
       .into_iter()
       .for_each(|bit| frame.extend(&self.symbols[bit as usize]));
     frame
   }
 
-  fn decode(&mut self, samples: &[f32]) -> PhyPacket {
+  fn decode(&mut self, samples: &[f32]) -> BytesPacket {
     assert_eq!(samples.len(), Self::SAMPLES_PER_PACKET);
 
     let mut bits = Vec::with_capacity(Self::SYMBOLS_PER_PACKET);
@@ -47,7 +47,8 @@ impl Codec for PSK {
     let packet = bits_to_bytes(&bits);
     packet
   }
-
+}
+impl PSK {
   fn new() -> Self {
     use std::f32::consts::TAU;
     let dt = 1.0 / Self::SAMPLE_RATE as f32;
@@ -62,6 +63,11 @@ impl Codec for PSK {
   }
 }
 
+impl Default for PSK {
+  fn default() -> Self {
+    Self::new()
+  }
+}
 
 // TODO: OFDM + PSK
 

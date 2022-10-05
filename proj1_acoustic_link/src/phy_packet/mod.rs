@@ -1,6 +1,12 @@
+/// Frame: a audio signal.
+/// A frame consists of a preamble section and a payload section.
+///
+/// Packet: a chunk of bytes.
+/// A packet is sent/received with no data integrity guarantee
+
 /// define the traits for physics layer
 pub mod traits;
-pub use traits::{Codec, Frame, FrameDetector, PhyPacket, PhyPacketReceiver, PhyPacketSender, PreambleGenerator};
+pub use traits::{Codec, FramePayload, FrameDetector, BytesPacket, PhyPacketReceiver, PhyPacketSender, PreambleGen};
 
 /// implementors of [`FrameDetector`]: audio stream framing algorithms.
 pub mod frame_detect;
