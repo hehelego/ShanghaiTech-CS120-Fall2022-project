@@ -5,6 +5,7 @@ use cpal::{
 
 use crate::{
   block_buffer::ConcurrentBuffer,
+  defaut_config,
   traits::{InStream, OutStream},
 };
 
@@ -91,9 +92,9 @@ impl Default for CpalInStream {
     let host = cpal::default_host();
     let input_device = host.default_input_device().expect("no default input device available");
     let stream_config = StreamConfig {
-      channels: 1,
-      sample_rate: cpal::SampleRate(48000),
-      buffer_size: cpal::BufferSize::Fixed(1024),
+      channels: defaut_config::CHANNELS,
+      sample_rate: cpal::SampleRate(defaut_config::SAMPLE_RATE),
+      buffer_size: cpal::BufferSize::Fixed(defaut_config::BUFFER_SIZE),
     };
     Self::new(input_device, stream_config).expect("failed to create input stream")
   }
@@ -123,9 +124,9 @@ impl Default for CpalOutStream {
       .default_output_device()
       .expect("no default output device available");
     let stream_config = StreamConfig {
-      channels: 1,
-      sample_rate: cpal::SampleRate(48000),
-      buffer_size: cpal::BufferSize::Fixed(1024),
+      channels: defaut_config::CHANNELS,
+      sample_rate: cpal::SampleRate(defaut_config::SAMPLE_RATE),
+      buffer_size: cpal::BufferSize::Fixed(defaut_config::BUFFER_SIZE),
     };
     Self::new(output_device, stream_config).expect("failed to create input stream")
   }
