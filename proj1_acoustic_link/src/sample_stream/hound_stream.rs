@@ -1,8 +1,15 @@
-use std::io::{Read, Seek, Write};
+use std::{
+  fs::File,
+  io::{BufReader, BufWriter, Read, Seek, Write},
+  path::Path,
+};
 
 use hound::{Error as WavError, WavReader, WavWriter};
 
-use crate::traits::{InStream, OutStream};
+use crate::{
+  traits::{InStream, OutStream},
+  DefaultConfig,
+};
 
 pub struct HoundInStream<R: Read>(WavReader<R>);
 
@@ -13,9 +20,31 @@ impl<R: Read> HoundInStream<R> {
     Self(wav_reader)
   }
 }
+impl HoundInStream<BufReader<File>> {
+  pub fn open<P>(filename: P) -> HoundInStream<BufReader<File>>
+  where
+    P: AsRef<Path>,
+  {
+    HoundInStream::new(hound::WavReader::open(filename).unwrap())
+  }
+}
+
 impl<W: Write + Seek> HoundOutStream<W> {
   pub fn new(wav_writer: WavWriter<W>) -> Self {
     Self(wav_writer)
+  }
+
+  pub fn finalize(self) {
+    self.0.finalize().unwrap()
+  }
+}
+impl HoundOutStream<BufWriter<File>> {
+  pub fn create<P>(filename: P) -> HoundOutStream<BufWriter<File>>
+  where
+    P: AsRef<Path>,
+  {
+    let spec = DefaultConfig::new();
+    HoundOutStream::new(hound::WavWriter::create(filename, spec).unwrap())
   }
 }
 

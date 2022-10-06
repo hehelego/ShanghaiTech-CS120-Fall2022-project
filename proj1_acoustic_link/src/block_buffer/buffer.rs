@@ -35,6 +35,11 @@ impl<T> Buffer<T> {
   {
     self.push(src.collect());
   }
+
+  /// Clear all the data in buffer.
+  pub fn clear(&mut self) {
+    self.blocks.clear();
+  }
 }
 
 impl<T: Clone> Buffer<T> {
