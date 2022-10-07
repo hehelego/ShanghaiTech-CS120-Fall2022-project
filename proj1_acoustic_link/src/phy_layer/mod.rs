@@ -1,43 +1,8 @@
-use crate::phy_packet::{
-  audio_phy_txrx::PhyReceiver, audio_phy_txrx::PhySender, frame_detect::CorrelationFraming as FrameDetector,
-  modulation::PSK as Codec_, preambles::ChirpUpDown as Preamble,
-};
-use crate::phy_packet::{PhyPacket, Codec, PreambleGen};
+mod plain;
+pub use plain::Plain as PlainPhy;
 
-use crate::sample_stream::{CpalInStream as InStream, CpalOutStream as OutStream};
-use crate::traits::{PacketReceiver, PacketSender};
+mod with_crc;
+pub use with_crc::{PacketCorrupt, WithCrc as CrcPhy};
 
-type Tx = PhySender<Preamble, Codec_, OutStream, ()>;
-type Rx = PhyReceiver<Preamble, Codec_, FrameDetector, InStream, ()>;
-
-/// a physics layer peer object.
-/// send/recv packets with no latency/correctness guarantee.
-pub struct PhyLayer {
-  tx: Tx,
-  rx: Rx,
-}
-
-impl PhyLayer {
-  pub const PACKET_BYTES: usize = Codec_::BYTES_PER_PACKET;
-  pub const PACKET_SAMPLES: usize = Preamble::PREAMBLE_LEN + Codec_::SAMPLES_PER_PACKET;
-  pub fn new(tx: Tx, rx: Rx) -> Self {
-    Self { tx, rx }
-  }
-  pub fn send(&mut self, packet: PhyPacket) -> Result<(), ()> {
-    self.tx.send(packet)
-  }
-  pub fn recv(&mut self) -> Result<PhyPacket, ()> {
-    self.rx.recv()
-  }
-}
-impl Default for PhyLayer {
-  fn default() -> Self {
-    let tx = Tx::new(OutStream::default(), Codec_::default());
-    let rx = Rx::new(
-      InStream::default(),
-      Codec_::default(),
-      FrameDetector::new::<Preamble, { Codec_::SAMPLES_PER_PACKET }>(),
-    );
-    Self::new(tx, rx)
-  }
-}
+mod rs_transmit;
+pub use rs_transmit::{ecc_recv, ecc_send};
