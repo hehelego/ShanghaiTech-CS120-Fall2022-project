@@ -1,15 +1,15 @@
 use crate::traits::{PacketReceiver, PacketSender};
 
+/// PHY layers send/receive packets of type [`PhyPacket`], which is a fixed size bytes slice
+pub type PhyPacket = Vec<u8>;
+
 /// packet sender types that can send [`PhyPacket`]
-pub trait PhyPacketSender<E>: PacketSender<BytesPacket, E> {}
-impl<PS, E> PhyPacketSender<E> for PS where PS: PacketSender<BytesPacket, E> {}
+pub trait PhyPacketSender<E>: PacketSender<PhyPacket, E> {}
+impl<PS, E> PhyPacketSender<E> for PS where PS: PacketSender<PhyPacket, E> {}
 
 /// packet receiver types that can receive [`PhyPacket`]
-pub trait PhyPacketReceiver<E>: PacketReceiver<BytesPacket, E> {}
-impl<PR, E> PhyPacketReceiver<E> for PR where PR: PacketReceiver<BytesPacket, E> {}
-
-/// A [`BytesPacket`] is a packet of data in the physics layer
-pub type BytesPacket = Vec<u8>;
+pub trait PhyPacketReceiver<E>: PacketReceiver<PhyPacket, E> {}
+impl<PR, E> PhyPacketReceiver<E> for PR where PR: PacketReceiver<PhyPacket, E> {}
 
 /// the sequence of PCM samples put at the begining of each [`PhyPacket`] in acoustic channel.
 pub type FramePreamble = Vec<f32>;
@@ -39,7 +39,7 @@ pub trait Codec: Default {
   /// Decode a chunk of bytes from a sequence of PCM samples.  
   /// The given sequence should have exactly [`Self::SAMPLES_PER_PACKET`] samples.
   /// The return data should have exactly [`Self::BYTES_PER_PACKET`] bytes.
-  fn decode(&mut self, samples: &[f32]) -> BytesPacket;
+  fn decode(&mut self, samples: &[f32]) -> PhyPacket;
 }
 
 /// type traits for frame detector strategy

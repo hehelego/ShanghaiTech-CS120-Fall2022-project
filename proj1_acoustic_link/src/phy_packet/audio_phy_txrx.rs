@@ -1,4 +1,4 @@
-use super::{traits::BytesPacket, Codec, FrameDetector, FramePayload, PreambleGen};
+use super::{traits::PhyPacket, Codec, FrameDetector, FramePayload, PreambleGen};
 use crate::{
   sample_stream::{SampleInStream, SampleOutStream},
   traits::{PacketReceiver, PacketSender},
@@ -44,7 +44,7 @@ where
 
   pub const SAMPLES_PER_PACKET: usize = PG::PREAMBLE_LEN + CC::SAMPLES_PER_PACKET;
 }
-impl<PG, CC, SS, E> PacketSender<BytesPacket, E> for PhySender<PG, CC, SS, E>
+impl<PG, CC, SS, E> PacketSender<PhyPacket, E> for PhySender<PG, CC, SS, E>
 where
   PG: PreambleGen,
   CC: Codec,
@@ -55,7 +55,7 @@ where
   /// - preamble: predefined samples
   /// - payload: output of modulation on packet bytes
   /// NOTE: write them to the underlying stream together with `write_once`
-  fn send(&mut self, packet: BytesPacket) -> Result<(), E> {
+  fn send(&mut self, packet: PhyPacket) -> Result<(), E> {
     assert_eq!(packet.len(), CC::BYTES_PER_PACKET);
     let mut buf = Vec::with_capacity(PG::PREAMBLE_LEN + CC::SAMPLES_PER_PACKET);
     buf.extend(&self.preamble_samples);
@@ -131,7 +131,7 @@ where
   }
 }
 
-impl<PG, CC, FD, SS, E> PacketReceiver<BytesPacket, E> for PhyReceiver<PG, CC, FD, SS, E>
+impl<PG, CC, FD, SS, E> PacketReceiver<PhyPacket, E> for PhyReceiver<PG, CC, FD, SS, E>
 where
   PG: PreambleGen,
   CC: Codec,
@@ -139,7 +139,7 @@ where
   SS: SampleInStream<E>,
 {
   // receive frame from the channel and then demodulate the signal
-  fn recv(&mut self) -> Result<BytesPacket, E> {
+  fn recv(&mut self) -> Result<PhyPacket, E> {
     let frame_payload = self.frame_payload_rx.recv().unwrap();
     Ok(self.codec.decode(&frame_payload))
   }

@@ -1,6 +1,6 @@
 use crate::helper::{bits_to_bytes, bytes_to_bits, dot_product};
 
-use super::{BytesPacket, Codec, FramePayload};
+use super::{PhyPacket, Codec, FramePayload};
 
 // TODO: PSK
 /// PSK (phase shift keying)  
@@ -35,7 +35,7 @@ impl Codec for PSK {
     frame
   }
 
-  fn decode(&mut self, samples: &[f32]) -> BytesPacket {
+  fn decode(&mut self, samples: &[f32]) -> PhyPacket {
     assert_eq!(samples.len(), Self::SAMPLES_PER_PACKET);
 
     let mut bits = Vec::with_capacity(Self::SYMBOLS_PER_PACKET);
