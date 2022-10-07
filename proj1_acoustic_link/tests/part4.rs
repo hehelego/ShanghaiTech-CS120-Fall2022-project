@@ -1,6 +1,6 @@
 use crc::{Crc, CRC_64_ECMA_182};
 use proj1_acoustic_link::{
-  helper::bytes_to_bits,
+  helper::{bytes_to_bits, bits_to_bytes},
   phy_layer::{ecc_recv, ecc_send},
 };
 use rand::{distributions::Standard, Rng};
@@ -40,7 +40,7 @@ pub fn part4_sendfile() {
     })
     .collect();
   assert_eq!(bits.len(), 10000);
-  let bytes = bytes_to_bits(&bits);
+  let bytes = bits_to_bytes(&bits);
   println!("send {:?}", checksum(&bytes));
   ecc_send(&bytes);
 }
