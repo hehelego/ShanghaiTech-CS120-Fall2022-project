@@ -2,7 +2,7 @@ use crate::phy_packet::{
   audio_phy_txrx::PhyReceiver, audio_phy_txrx::PhySender, frame_detect::CorrelationFraming as FrameDetector,
   modulation::PSK as Codec_, preambles::ChirpUpDown as Preamble,
 };
-use crate::phy_packet::{BytesPacket, Codec, PreambleGen};
+use crate::phy_packet::{PhyPacket, Codec, PreambleGen};
 
 use crate::sample_stream::{CpalInStream as InStream, CpalOutStream as OutStream};
 use crate::traits::{PacketReceiver, PacketSender};
@@ -23,10 +23,10 @@ impl PhyLayer {
   pub fn new(tx: Tx, rx: Rx) -> Self {
     Self { tx, rx }
   }
-  pub fn send(&mut self, packet: BytesPacket) -> Result<(), ()> {
+  pub fn send(&mut self, packet: PhyPacket) -> Result<(), ()> {
     self.tx.send(packet)
   }
-  pub fn recv(&mut self) -> Result<BytesPacket, ()> {
+  pub fn recv(&mut self) -> Result<PhyPacket, ()> {
     self.rx.recv()
   }
 }
