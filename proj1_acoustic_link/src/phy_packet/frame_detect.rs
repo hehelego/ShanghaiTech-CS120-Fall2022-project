@@ -35,6 +35,7 @@ impl StreamBuf {
     self.smooth_power = self.smooth_power * 63.0 / 64.0 + sample * sample / 64.0;
     if self.window.len() == self.cap {
       self.window.pop_front();
+      self.head_index += 1;
     }
     self.window.push_back(sample);
   }
