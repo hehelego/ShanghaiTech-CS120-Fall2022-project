@@ -213,7 +213,7 @@ impl CorrelationFraming {
       detect_peak_idx: 0,
       detect_win: Window::new(PG::PREAMBLE_LEN),
       // part: members for wait state
-      frame_payload: Vec::with_capacity(frame_len),
+      frame_payload: Vec::with_capacity(PAYLOAD_LEN),
     }
   }
 }
