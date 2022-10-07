@@ -45,7 +45,7 @@ where
 pub fn bytes_to_bits(bytes: &[u8]) -> Vec<u8> {
   let mut bits = Vec::with_capacity(bytes.len() * 8);
   bytes
-    .into_iter()
+    .iter()
     .for_each(|byte| (0..8).for_each(|i| bits.push((byte >> i) & 1)));
   bits
 }
