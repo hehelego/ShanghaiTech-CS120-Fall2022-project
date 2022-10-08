@@ -2,13 +2,13 @@ use crate::phy_packet::{
   audio_phy_txrx::PhyReceiver, audio_phy_txrx::PhySender, frame_detect::CorrelationFraming as FrameDetector,
   modulation::PSK as Codec_, preambles::ChirpUpDown as Preamble,
 };
-use crate::phy_packet::{PhyPacket, Codec, PreambleGen};
+use crate::phy_packet::{Codec, PhyPacket, PreambleGen};
 
 use crate::sample_stream::{CpalInStream as InStream, CpalOutStream as OutStream};
 use crate::traits::{PacketReceiver, PacketSender};
 
 type Tx = PhySender<Preamble, Codec_, OutStream, ()>;
-type Rx = PhyReceiver<Preamble, Codec_, FrameDetector, InStream, ()>;
+type Rx = PhyReceiver<Preamble, Codec_, FrameDetector<Preamble>, InStream, ()>;
 
 /// a physics layer peer object.
 /// send/recv packets with no latency/correctness guarantee.
@@ -36,7 +36,7 @@ impl Default for PhyLayer {
     let rx = Rx::new(
       InStream::default(),
       Codec_::default(),
-      FrameDetector::new::<Preamble, { Codec_::SAMPLES_PER_PACKET }>(),
+      FrameDetector::new::<{ Codec_::SAMPLES_PER_PACKET }>(Preamble::new()),
     );
     Self::new(tx, rx)
   }
