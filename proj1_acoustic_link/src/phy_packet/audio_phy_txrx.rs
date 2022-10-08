@@ -57,7 +57,12 @@ where
   /// NOTE: write them to the underlying stream together with `write_once`
   fn send(&mut self, packet: PhyPacket) -> Result<(), E> {
     assert_eq!(packet.len(), CC::BYTES_PER_PACKET);
-    let mut buf = Vec::with_capacity(PG::PREAMBLE_LEN + CC::SAMPLES_PER_PACKET);
+
+    const WARMUP_LEN: usize = 80;
+    const WARMUP_VAL: f32 = 0.8;
+
+    let mut buf = Vec::with_capacity(WARMUP_LEN + PG::PREAMBLE_LEN + CC::SAMPLES_PER_PACKET);
+    buf.extend(std::iter::repeat(WARMUP_VAL).take(WARMUP_LEN));
     buf.extend(&self.preamble_samples);
     buf.extend(self.codec.encode(&packet));
     self.stream_out.write_exact(&buf)
