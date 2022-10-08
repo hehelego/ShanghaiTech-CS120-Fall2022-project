@@ -1,5 +1,3 @@
-use cpal::Sample;
-
 use super::{FrameDetector, FramePayload, PreambleGen};
 use crate::helper::dot_product;
 use std::collections::VecDeque;
