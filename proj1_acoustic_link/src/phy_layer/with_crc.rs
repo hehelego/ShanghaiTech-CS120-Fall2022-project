@@ -47,8 +47,8 @@ impl PacketReceiver<PhyPacket, PacketCorrupt> for WithCrc {
   /// receive a packet and verify
   fn recv(&mut self) -> Result<PhyPacket, PacketCorrupt> {
     let packet = self.txrx.recv().unwrap();
-    let crc_field = packet[PlainPhy::PACKET_BYTES - 1];
-    let crc = self.crc.checksum(&packet);
+    let crc_field = *packet.last().unwrap();
+    let crc = self.crc.checksum(&packet[..Self::PACKET_BYTES]);
     if crc == crc_field {
       Ok(packet[..Self::PACKET_BYTES].into())
     } else {
