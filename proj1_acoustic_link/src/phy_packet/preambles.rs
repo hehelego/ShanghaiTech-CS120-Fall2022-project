@@ -31,6 +31,12 @@ impl ChirpUpDown {
   }
 }
 
+impl Default for ChirpUpDown {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PreambleGen for ChirpUpDown {
   const PREAMBLE_LEN: usize = ChirpUpDown::N;
 

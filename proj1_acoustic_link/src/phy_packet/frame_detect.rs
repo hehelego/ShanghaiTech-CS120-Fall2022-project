@@ -1,5 +1,3 @@
-use cpal::Sample;
-
 use super::{FrameDetector, FramePayload, PreambleGen};
 use crate::helper::dot_product;
 use std::collections::VecDeque;
@@ -38,7 +36,7 @@ impl PreambleWindow {
   pub fn len(&self) -> usize {
     self.buffer.len()
   }
-  pub fn iter(&self) -> std::collections::vec_deque::Iter<f32> {
+  pub fn iter(&self) -> impl ExactSizeIterator<Item = &'_ f32> {
     self.buffer.iter()
   }
   pub fn norm(&self) -> f32 {
