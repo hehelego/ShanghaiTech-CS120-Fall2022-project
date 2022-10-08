@@ -56,7 +56,7 @@ impl PreambleWindow {
   }
   // Extract the samples from `index + 1` to the end of the buffer.
   pub fn extract_samples_to_end(&mut self, index: usize) -> Vec<f32> {
-    let start = index - self.head_index + 1;
+    let start = index - self.head_index;
     self.buffer.range(start..).cloned().collect()
   }
   pub fn clear(&mut self) {
@@ -178,9 +178,8 @@ where
       self
         .frame_payload
         .extend(self.detect_window.extract_samples_to_end(self.corr_peak_index));
-
+      println!("Log: Wait Payload. Peak index: {}", self.corr_peak_index);
       self.reset_detection_state();
-      println!("Log: Wait Payload");
       return FramingState::WaitPayload;
     }
     return FramingState::DetectFallingEdge;
@@ -241,109 +240,4 @@ where
 }
 
 #[cfg(test)]
-mod tests {
-
-  use crate::phy_packet::{preambles::ChirpUpDown, FrameDetector, PreambleGen};
-
-  use super::CorrelationFraming;
-
-  #[test]
-  // #[cfg(feature = "wired")]
-  fn corr_detect() {
-    const PL_LEN: usize = 500;
-
-    let preamble = ChirpUpDown::generate();
-    let mut detector = CorrelationFraming::new::<PL_LEN>(ChirpUpDown::new());
-
-    // preamble sequence
-    preamble
-      .iter()
-      .map(|x| x * 0.8 + 0.1 * x.sin())
-      .for_each(|x| assert_eq!(detector.on_sample(x), None));
-
-    // the payload: exactly one frame will be found
-    let mut s = 0;
-    for i in 0..PL_LEN * 2 {
-      let v = (0.33 * i as f32).sin();
-      if detector.on_sample(v).is_some() {
-        println!("detected {}/{}", i, PL_LEN);
-        s += 1;
-      }
-    }
-    assert_eq!(s, 1);
-
-    // trash: no frame will be found
-    s = 0;
-    for i in 0..PL_LEN * 2 {
-      let v = (0.33 * i as f32).sin();
-      if detector.on_sample(v).is_some() {
-        println!("detected {}/{}", i, PL_LEN);
-        s += 1;
-      }
-    }
-    assert_eq!(s, 0);
-  }
-  #[test]
-  // #[cfg(feature = "wired")]
-  fn corr_detect_multi() {
-    const PL_LEN: usize = 500;
-    const N: usize = 10;
-
-    let preamble = ChirpUpDown::generate();
-    let mut detector = CorrelationFraming::new::<PL_LEN>(ChirpUpDown::new());
-    let mut s = 0;
-
-    for j in 1..N {
-      // preamble sequence
-      preamble
-        .iter()
-        .map(|x| x * 0.8 + 0.1 * x.sin())
-        .for_each(|x| assert_eq!(detector.on_sample(x), None));
-
-      // the payload: exactly one frame will be found
-      for i in 0..PL_LEN * 2 {
-        let v = (0.33 * i as f32).sin();
-        if detector.on_sample(v).is_some() {
-          println!("detected {}/{}", i, PL_LEN);
-          s += 1;
-        }
-      }
-      assert_eq!(s, j);
-    }
-
-    // trash: no frame will be found
-    s = 0;
-    for i in 0..PL_LEN * 2 {
-      let v = (0.33 * i as f32).sin();
-      if detector.on_sample(v).is_some() {
-        println!("detected {}/{}", i, PL_LEN);
-        s += 1;
-      }
-    }
-    assert_eq!(s, 0);
-  }
-  // #[cfg(feature = "wired")]
-  #[test]
-  fn corr_detect_none() {
-    const PRE_LEN: usize = 200;
-    const PL_LEN: usize = 400;
-
-    let mut detector = CorrelationFraming::new::<PL_LEN>(ChirpUpDown::new());
-
-    // trash sequence
-    let recv: Vec<_> = (0..PRE_LEN).map(|x| x as f32).collect();
-    recv.iter().for_each(|&x| assert_eq!(detector.on_sample(x), None));
-
-    // more random stuff
-    let mut s = 0;
-    for i in 0..PL_LEN * 20 {
-      let v = (0.33 * i as f32).sin();
-      if detector.on_sample(v).is_some() {
-        println!("detected {}/{}", i, PL_LEN);
-        s += 1;
-      }
-    }
-    // expectation: no frame found
-    assert_eq!(s, 0);
-  }
-}
+mod tests;
