@@ -49,7 +49,7 @@ impl PreambleWindow {
     self.buffer.push_back(sample);
     self.square_sum += sample * sample;
     self.smooth_power = self.smooth_power * 63.0 / 64.0 + sample * sample / 64.0;
-    // Pop the  steal sample
+    // Pop the steal sample
     if self.buffer.len() > self.capacity {
       let old_sample = self.buffer.pop_front().unwrap();
       self.head_index += 1;
@@ -153,10 +153,11 @@ where
       self.corr_peak_value = corr2pwr;
       self.corr_peak_index = self.detect_window.tail_index;
       println!("Log: Detect Rising Edge");
-      return FramingState::DetectRisingEdge;
+      FramingState::DetectRisingEdge
+    } else {
+      // Wait for preambles
+      FramingState::DetectPreambleStart
     }
-    // Wait for preambles
-    return FramingState::DetectPreambleStart;
   }
 
   // Try to find the peak of the preamble. If it starts falling, it will enter detect falling edge.
@@ -170,7 +171,7 @@ where
     }
     self.corr_peak_value = corr2pwr;
     self.corr_peak_index = self.detect_window.tail_index;
-    return FramingState::DetectRisingEdge;
+    FramingState::DetectRisingEdge
   }
 
   fn detect_falling_edge(&mut self, sample: f32) -> FramingState {
@@ -183,9 +184,10 @@ where
 
       self.reset_detection_state();
       println!("Log: Wait Payload");
-      return FramingState::WaitPayload;
+      FramingState::WaitPayload
+    } else {
+      FramingState::DetectFallingEdge
     }
-    return FramingState::DetectFallingEdge;
   }
 
   fn wait_payload(&mut self, sample: f32) -> (FramingState, Option<FramePayload>) {
