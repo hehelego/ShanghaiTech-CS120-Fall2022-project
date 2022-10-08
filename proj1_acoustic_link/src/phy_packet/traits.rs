@@ -22,7 +22,11 @@ pub trait PreambleGen {
   const PREAMBLE_LEN: usize;
 
   /// generate the preamble samples, should contain exactly [`Self::PREAMBLE_LEN`] samples.
-  fn generate() -> FramePreamble;
+  fn samples(&self) -> FramePreamble;
+  fn norm(&self) -> f32;
+  fn len(&self) -> usize;
+  fn generate() -> Self;
+  fn iter(&self) -> std::slice::Iter<f32>;
 }
 
 /// type traits for encoding/decoding [`PhyPacket`]

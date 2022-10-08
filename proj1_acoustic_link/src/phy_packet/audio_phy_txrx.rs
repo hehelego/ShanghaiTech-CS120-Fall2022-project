@@ -31,7 +31,7 @@ where
   SS: SampleOutStream<E>,
 {
   pub fn new(stream_out: SS, codec: CC) -> Self {
-    let preamble_samples = PG::generate();
+    let preamble_samples = PG::generate().samples();
 
     Self {
       _pg: PhantomData::default(),

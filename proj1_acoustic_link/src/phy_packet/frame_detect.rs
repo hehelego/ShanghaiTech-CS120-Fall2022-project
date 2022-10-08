@@ -4,6 +4,7 @@ use super::{FrameDetector, FramePayload, PreambleGen};
 use crate::helper::dot_product;
 use std::collections::VecDeque;
 
+// State for CorraltionFraming
 enum FramingState {
   DetectPreambleStart,
   DetectRisingEdge,
@@ -11,8 +12,10 @@ enum FramingState {
   WaitPayload,
 }
 
+// Window for store the samples temporarily.
 struct PreambleWindow {
   buffer: VecDeque<f32>,
+  // The two index will continous increase during one detection session, and reset to zero after detecting one package.
   head_index: usize,
   tail_index: usize,
   capacity: usize,
@@ -21,6 +24,7 @@ struct PreambleWindow {
 }
 
 impl PreambleWindow {
+  // create PreambleWindow capacity. This should be at least as long as the preamble.
   pub fn with_capacity(capacity: usize) -> PreambleWindow {
     Self {
       buffer: VecDeque::new(),
@@ -45,18 +49,18 @@ impl PreambleWindow {
     self.buffer.push_back(sample);
     self.square_sum += sample * sample;
     self.smooth_power = self.smooth_power * 63.0 / 64.0 + sample * sample / 64.0;
-    // Pop steal samples
+    // Pop the  steal sample
     if self.buffer.len() > self.capacity {
       let old_sample = self.buffer.pop_front().unwrap();
       self.head_index += 1;
       self.square_sum -= old_sample * old_sample;
     }
   }
+  // Extract the samples from `index + 1` to the end of the buffer.
   pub fn extract_samples_to_end(&mut self, index: usize) -> Vec<f32> {
     let start = index - self.head_index + 1;
     self.buffer.range(start..).cloned().collect()
   }
-
   pub fn clear(&mut self) {
     self.buffer.clear();
     self.head_index = 0;
@@ -66,20 +70,47 @@ impl PreambleWindow {
   }
 }
 
-pub struct CorrelationFraming {
-  detect_window: PreambleWindow,
-  state: FramingState,
-  frame_payload: Vec<f32>,
-  payload_size: usize,
-  peak_index: usize,
-  peak_value: f32,
-  // part: preamble
-  preamble_len: usize, // number of samples in the preamble sequence
-  preamble: Vec<f32>,  // preamble sample sequence
-  preamble_norm: f32,  // norm of the preamble vector: square root of the square sum of preamble samples
+struct Payload {
+  buffer: Vec<f32>,
+  size: usize,
 }
 
-impl CorrelationFraming {
+impl Payload {
+  pub fn new<const SIZE: usize>() -> Self {
+    Self {
+      buffer: Vec::with_capacity(SIZE),
+      size: SIZE,
+    }
+  }
+  pub fn extend(&mut self, samples: Vec<f32>) {
+    assert!(samples.len() <= self.size);
+    self.buffer.extend(samples.iter())
+  }
+  pub fn update(&mut self, sample: f32) -> Option<Vec<f32>> {
+    self.buffer.push(sample);
+    if self.buffer.len() == self.size {
+      let frame = self.buffer.clone();
+      self.buffer.clear();
+      Some(frame)
+    } else {
+      None
+    }
+  }
+}
+
+pub struct CorrelationFraming<PG: PreambleGen> {
+  state: FramingState,
+  preamble_gen: PG,
+  detect_window: PreambleWindow,
+  frame_payload: Payload,
+  corr_peak_index: usize,
+  corr_peak_value: f32,
+}
+
+impl<PG> CorrelationFraming<PG>
+where
+  PG: PreambleGen,
+{
   /// For preamble detection,
   /// the ratio of the correlation power to the received signal average power
   /// must be greater than this threshold.
@@ -93,23 +124,19 @@ impl CorrelationFraming {
   /// The falling edge can be detected about 200 samples after the correlation peak appears.
   pub const AFTER_PEAK_SAMPLES: usize = 200;
 
-  pub fn new<PG, const PAYLOAD_LEN: usize>() -> CorrelationFraming
+  /// Create the CorrelationFraming detector with given preamble generator and layload length
+  pub fn new<const PAYLOAD_LEN: usize>(preamble_gen: PG) -> CorrelationFraming<PG>
   where
     PG: PreambleGen,
   {
-    let preamble = PG::generate();
-    let sqr_sum = preamble.iter().fold(0.0, |s, &x| s + x * x);
     println!("Detect Preamble Start");
     Self {
       detect_window: PreambleWindow::with_capacity(PG::PREAMBLE_LEN),
       state: FramingState::DetectPreambleStart,
-      frame_payload: Vec::new(),
-      payload_size: PAYLOAD_LEN,
-      preamble_len: PG::PREAMBLE_LEN,
-      preamble: PG::generate(),
-      preamble_norm: sqr_sum.sqrt(),
-      peak_index: 0,
-      peak_value: 0.0,
+      frame_payload: Payload::new::<PAYLOAD_LEN>(),
+      corr_peak_index: 0,
+      corr_peak_value: 0.0,
+      preamble_gen,
     }
   }
 
@@ -117,16 +144,14 @@ impl CorrelationFraming {
   fn detect_preamble_start(&mut self, sample: f32) -> FramingState {
     self.detect_window.update(sample);
     // Not enough samples
-    if self.detect_window.len() < self.preamble_len {
+    if self.detect_window.len() < self.preamble_gen.len() {
       return FramingState::DetectPreambleStart;
     }
     // To check if is the beginning of the preamble
-    let dot = dot_product(self.detect_window.iter(), self.preamble.iter());
-    let corr2pwr = (dot / self.preamble_len as f32) / self.detect_window.smooth_power;
-    let cosine_sim = dot / self.preamble_norm / self.detect_window.norm();
+    let (corr2pwr, cosine_sim) = self.calculate_relations();
     if corr2pwr >= Self::CORR_TO_PWR_MIN && cosine_sim >= Self::COSINE_MIN {
-      self.peak_value = corr2pwr;
-      self.peak_index = self.detect_window.tail_index;
+      self.corr_peak_value = corr2pwr;
+      self.corr_peak_index = self.detect_window.tail_index;
       println!("Log: Detect Rising Edge");
       return FramingState::DetectRisingEdge;
     }
@@ -138,26 +163,25 @@ impl CorrelationFraming {
   fn detect_rising_edge(&mut self, sample: f32) -> FramingState {
     self.detect_window.update(sample);
     // Get the data.
-    let dot = dot_product(self.detect_window.iter(), self.preamble.iter());
-    let corr2pwr = (dot / self.preamble_len as f32) / self.detect_window.smooth_power;
-    let cosine_sim = dot / self.preamble_norm / self.detect_window.norm();
-    if corr2pwr < self.peak_value || cosine_sim < Self::COSINE_MIN {
+    let (corr2pwr, cosine_sim) = self.calculate_relations();
+    if corr2pwr < self.corr_peak_value || cosine_sim < Self::COSINE_MIN {
       println!("Log: Detect Falling Edge");
       return FramingState::DetectFallingEdge;
     }
-    self.peak_value = corr2pwr;
-    self.peak_index = self.detect_window.tail_index;
+    self.corr_peak_value = corr2pwr;
+    self.corr_peak_index = self.detect_window.tail_index;
     return FramingState::DetectRisingEdge;
   }
 
   fn detect_falling_edge(&mut self, sample: f32) -> FramingState {
     self.detect_window.update(sample);
     // If we have found the tail.
-    if self.detect_window.tail_index - self.peak_index > Self::AFTER_PEAK_SAMPLES {
-      self.frame_payload = self.detect_window.extract_samples_to_end(self.peak_index);
-      self.detect_window.clear();
-      self.peak_value = 0.0;
-      self.peak_index = 0;
+    if self.detect_window.tail_index - self.corr_peak_index > Self::AFTER_PEAK_SAMPLES {
+      self
+        .frame_payload
+        .extend(self.detect_window.extract_samples_to_end(self.corr_peak_index));
+
+      self.reset_detection_state();
       println!("Log: Wait Payload");
       return FramingState::WaitPayload;
     }
@@ -167,23 +191,34 @@ impl CorrelationFraming {
   fn wait_payload(&mut self, sample: f32) -> (FramingState, Option<FramePayload>) {
     // assert!(self.frame_payload.len() < self.frame_payload.capacity());
     // append the newly found sample into the payload window
-    self.frame_payload.push(sample);
-    // wait until we have enough example
-    if self.frame_payload.len() == self.payload_size {
-      // extract the payload section, clear the payload window.
-      let frame = self.frame_payload.clone();
-      self.frame_payload.clear();
-      // we have extracted a whole frame,
-      // next: try to detect another frame
-      (FramingState::DetectPreambleStart, Some(frame))
+    if let Some(payload) = self.frame_payload.update(sample) {
+      (FramingState::DetectPreambleStart, Some(payload))
     } else {
-      // no enough samples, continue to wait for more samples.
       (FramingState::WaitPayload, None)
     }
+    // wait until we have enough example
+  }
+
+  // Calculate the relations between preamble and samples. Return the ratio of correlation power to the received signal average power and cosine similarity.
+  fn calculate_relations(&self) -> (f32, f32) {
+    let dot = dot_product(self.detect_window.iter(), self.preamble_gen.iter());
+    let corr2pwr = (dot / self.preamble_gen.len() as f32) / self.detect_window.smooth_power;
+    let cosine_sim = dot / self.preamble_gen.norm() / self.detect_window.norm();
+    (corr2pwr, cosine_sim)
+  }
+
+  // reset the fields relatated to preable detection.
+  fn reset_detection_state(&mut self) {
+    self.detect_window.clear();
+    self.corr_peak_value = 0.0;
+    self.corr_peak_index = 0;
   }
 }
 
-impl FrameDetector for CorrelationFraming {
+impl<PG> FrameDetector for CorrelationFraming<PG>
+where
+  PG: PreambleGen,
+{
   fn on_sample(&mut self, sample: f32) -> Option<FramePayload> {
     match self.state {
       FramingState::WaitPayload => {
@@ -215,11 +250,12 @@ mod tests {
   use super::CorrelationFraming;
 
   #[test]
+  // #[cfg(feature = "wired")]
   fn corr_detect() {
     const PL_LEN: usize = 500;
 
     let preamble = ChirpUpDown::generate();
-    let mut detector = CorrelationFraming::new::<ChirpUpDown, PL_LEN>();
+    let mut detector = CorrelationFraming::new::<PL_LEN>(ChirpUpDown::new());
 
     // preamble sequence
     preamble
@@ -249,13 +285,52 @@ mod tests {
     }
     assert_eq!(s, 0);
   }
+  #[test]
+  // #[cfg(feature = "wired")]
+  fn corr_detect_multi() {
+    const PL_LEN: usize = 500;
+    const N: usize = 10;
 
+    let preamble = ChirpUpDown::generate();
+    let mut detector = CorrelationFraming::new::<PL_LEN>(ChirpUpDown::new());
+    let mut s = 0;
+
+    for j in 1..N {
+      // preamble sequence
+      preamble
+        .iter()
+        .map(|x| x * 0.8 + 0.1 * x.sin())
+        .for_each(|x| assert_eq!(detector.on_sample(x), None));
+
+      // the payload: exactly one frame will be found
+      for i in 0..PL_LEN * 2 {
+        let v = (0.33 * i as f32).sin();
+        if detector.on_sample(v).is_some() {
+          println!("detected {}/{}", i, PL_LEN);
+          s += 1;
+        }
+      }
+      assert_eq!(s, j);
+    }
+
+    // trash: no frame will be found
+    s = 0;
+    for i in 0..PL_LEN * 2 {
+      let v = (0.33 * i as f32).sin();
+      if detector.on_sample(v).is_some() {
+        println!("detected {}/{}", i, PL_LEN);
+        s += 1;
+      }
+    }
+    assert_eq!(s, 0);
+  }
+  // #[cfg(feature = "wired")]
   #[test]
   fn corr_detect_none() {
     const PRE_LEN: usize = 200;
     const PL_LEN: usize = 400;
 
-    let mut detector = CorrelationFraming::new::<ChirpUpDown, PL_LEN>();
+    let mut detector = CorrelationFraming::new::<PL_LEN>(ChirpUpDown::new());
 
     // trash sequence
     let recv: Vec<_> = (0..PRE_LEN).map(|x| x as f32).collect();
