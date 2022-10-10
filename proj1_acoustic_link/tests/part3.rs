@@ -77,7 +77,7 @@ fn part3_ck1_recv() {
 
   let mut bytes = vec![0; DATA_LEN + PAD_LEN];
   bytes.chunks_exact_mut(CHUNK_LEN).enumerate().for_each(|(idx, chunk)| {
-    let packet = physics_layer.recv().unwrap();
+    let packet = physics_layer.recv_timeout(Duration::from_secs(1)).unwrap();
     chunk.copy_from_slice(&packet);
     println!("recv [{}/{}]", idx + 1, (DATA_LEN + PAD_LEN) / CHUNK_LEN);
   });
