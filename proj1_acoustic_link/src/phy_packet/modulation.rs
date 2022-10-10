@@ -28,7 +28,7 @@ impl Codec for PSK {
   fn encode(&mut self, bytes: &[u8]) -> FramePayload {
     assert_eq!(bytes.len(), Self::BYTES_PER_PACKET);
 
-    let mut frame = FramePayload::with_capacity(Self::SAMPLES_PER_SYMBOL);
+    let mut frame = FramePayload::with_capacity(Self::SAMPLES_PER_PACKET);
     bytes_to_bits(bytes)
       .into_iter()
       .for_each(|bit| frame.extend(&self.symbols[bit as usize]));
