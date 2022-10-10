@@ -1,5 +1,6 @@
 use proj1_acoustic_link::helper::{bits_to_bytes, bytes_to_bits};
-use proj1_acoustic_link::phy_layer::PhyLayer;
+use proj1_acoustic_link::phy_layer::PlainPHY;
+use proj1_acoustic_link::traits::{PacketReceiver, PacketSender};
 use rand::Rng;
 use std::fs;
 use std::thread::sleep;
@@ -36,7 +37,7 @@ fn pad_add_remove() {
   }
 }
 
-const CHUNK_LEN: usize = PhyLayer::PACKET_BYTES;
+const CHUNK_LEN: usize = PlainPHY::PACKET_BYTES;
 const DATA_LEN: usize = 10000 / 8;
 const PAD_LEN: usize = (CHUNK_LEN - DATA_LEN % CHUNK_LEN) % CHUNK_LEN;
 
@@ -44,7 +45,7 @@ const PAD_LEN: usize = (CHUNK_LEN - DATA_LEN % CHUNK_LEN) % CHUNK_LEN;
 #[ignore]
 fn part3_ck1_send() {
   const FILEPATH: &str = "INPUT.txt";
-  let mut physics_layer = PhyLayer::default();
+  let mut physics_layer = PlainPHY::default();
 
   let data_string = fs::read_to_string(FILEPATH).unwrap();
   let bits: Vec<_> = data_string
@@ -72,7 +73,7 @@ fn part3_ck1_send() {
 #[ignore]
 fn part3_ck1_recv() {
   const FILEPATH: &str = "OUTPUT.txt";
-  let mut physics_layer = PhyLayer::default();
+  let mut physics_layer = PlainPHY::default();
 
   let mut bytes = vec![0; DATA_LEN + PAD_LEN];
   bytes.chunks_exact_mut(CHUNK_LEN).enumerate().for_each(|(idx, chunk)| {

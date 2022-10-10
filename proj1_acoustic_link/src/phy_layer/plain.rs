@@ -16,16 +16,22 @@ impl PlainPHY {
   /// number of samples in one packet
   pub const PACKET_SAMPLES: usize = Preamble::PREAMBLE_LEN + Codec_::SAMPLES_PER_PACKET;
 
+  /// combine a sender and a receiver to get a physics layer object
   pub fn new(tx: Tx, rx: Rx) -> Self {
     Self { tx, rx }
   }
+}
 
+impl PacketSender<PhyPacket, ()> for PlainPHY {
   /// send a packet, return until send finished or error
-  pub fn send(&mut self, packet: PhyPacket) -> Result<(), ()> {
+  fn send(&mut self, packet: PhyPacket) -> Result<(), ()> {
+    assert_eq!(packet.len(), Self::PACKET_BYTES);
     self.tx.send(packet)
   }
+}
+impl PacketReceiver<PhyPacket, ()> for PlainPHY {
   /// receive a packet, return received a packet or error
-  pub fn recv(&mut self) -> Result<PhyPacket, ()> {
+  fn recv(&mut self) -> Result<PhyPacket, ()> {
     self.rx.recv()
   }
 }
