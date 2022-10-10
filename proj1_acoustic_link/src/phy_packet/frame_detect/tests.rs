@@ -166,9 +166,9 @@ mod wired_tests {
 
 #[cfg(not(feature = "wired"))]
 mod wireless_tests {
-  use crate::phy_packet::{frame_detect::CorrelationFraming, preambles::ChirpUpDown, FrameDetector, PreambleGen};
-  use crate::sample_stream::{CpalInStream, HoundInStream, HoundOutStream};
-  use crate::traits::{InStream, OutStream};
+  use crate::phy_packet::{frame_detect::CorrelationFraming, preambles::ChirpUpDown, FrameDetector};
+  use crate::sample_stream::CpalInStream;
+  use crate::traits::InStream;
 
   #[test]
   fn corr_detect_air_recv() {
