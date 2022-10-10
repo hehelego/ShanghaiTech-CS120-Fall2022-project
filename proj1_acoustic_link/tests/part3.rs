@@ -1,5 +1,5 @@
-use proj1_acoustic_link::helper::bytes_to_bits;
-use proj1_acoustic_link::{helper::bits_to_bytes, phy_layer::PhyLayer};
+use proj1_acoustic_link::helper::{bits_to_bytes, bytes_to_bits};
+use proj1_acoustic_link::phy_layer::PhyLayer;
 use rand::Rng;
 use std::fs;
 use std::thread::sleep;
