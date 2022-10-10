@@ -1,7 +1,3 @@
-/// type trait alias
-mod traits;
-pub use traits::{SampleInStream, SampleOutStream};
-
 /// sample stream IO with cpal audio I/O
 mod cpal_stream;
 /// sample stream IO with hound wav reader/writer
