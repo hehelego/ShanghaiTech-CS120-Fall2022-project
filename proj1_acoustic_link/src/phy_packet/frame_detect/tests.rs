@@ -127,33 +127,6 @@ mod wired_tests {
     }
     assert_eq!(s, 1);
   }
-}
-
-#[cfg(not(feature = "wired"))]
-mod wireless_tests {
-  use crate::phy_packet::{frame_detect::CorrelationFraming, preambles::ChirpUpDown, FrameDetector, PreambleGen};
-  use crate::sample_stream::{CpalInStream, HoundInStream, HoundOutStream};
-  use crate::traits::{InStream, OutStream};
-
-  #[test]
-  fn corr_detect_air_recv() {
-    const PL_LEN: usize = 500;
-    let mut buf = [0.0; ChirpUpDown::N + PL_LEN];
-    let mut cpal_in_stream = CpalInStream::default();
-    let mut s = 0;
-    let mut detector = CorrelationFraming::new::<PL_LEN>(ChirpUpDown::new());
-
-    'outer: loop {
-      cpal_in_stream.read_exact(&mut buf).unwrap();
-      for x in buf.iter() {
-        if detector.on_sample(*x).is_some() {
-          s += 1;
-          break 'outer;
-        }
-      }
-    }
-    assert_eq!(s, 1);
-  }
 
   #[test]
   fn corr_detect_air_multi_gen() {
@@ -189,6 +162,34 @@ mod wireless_tests {
     }
     assert_eq!(s, PACKET_NUM);
   }
+}
+
+#[cfg(not(feature = "wired"))]
+mod wireless_tests {
+  use crate::phy_packet::{frame_detect::CorrelationFraming, preambles::ChirpUpDown, FrameDetector, PreambleGen};
+  use crate::sample_stream::{CpalInStream, HoundInStream, HoundOutStream};
+  use crate::traits::{InStream, OutStream};
+
+  #[test]
+  fn corr_detect_air_recv() {
+    const PL_LEN: usize = 500;
+    let mut buf = [0.0; ChirpUpDown::N + PL_LEN];
+    let mut cpal_in_stream = CpalInStream::default();
+    let mut s = 0;
+    let mut detector = CorrelationFraming::new::<PL_LEN>(ChirpUpDown::new());
+
+    'outer: loop {
+      cpal_in_stream.read_exact(&mut buf).unwrap();
+      for x in buf.iter() {
+        if detector.on_sample(*x).is_some() {
+          s += 1;
+          break 'outer;
+        }
+      }
+    }
+    assert_eq!(s, 1);
+  }
+
 
   #[test]
   fn corr_detect_air_multi_recv() {
