@@ -1,6 +1,6 @@
 pub use crate::phy_packet::{
-  audio_phy_txrx::PhyReceiver, audio_phy_txrx::PhySender, frame_detect::CorrelationFraming as FrameDetector,
-  modulation::PSK as Codec_, preambles::ChirpUpDown as Preamble,
+  frame_detect::CorrelationFraming as FrameDetector, modulation::PSK as Codec_, preambles::ChirpUpDown as Preamble,
+  txrx::PhyReceiver, txrx::PhySender,
 };
 
 pub use crate::phy_packet::{Codec, PhyPacket, PreambleGen};
