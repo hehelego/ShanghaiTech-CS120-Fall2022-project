@@ -6,3 +6,6 @@ pub use paddings::{add_padding, remove_padding};
 
 mod signal;
 pub use signal::{dot_product,copy,chirp};
+
+#[cfg(test)]
+mod tests;
