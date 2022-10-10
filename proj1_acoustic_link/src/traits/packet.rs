@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 /// Send discrete packet of type `T` through the [`PacketSender`].
 /// Might encounter error of type `E`
 pub trait PacketSender<T, E> {
@@ -13,4 +15,7 @@ pub trait PacketReceiver<T, E> {
   /// The function should return immediately.
   /// Implementor should use a separted thread to detect packet.
   fn recv(&mut self) -> Result<T, E>;
+
+  /// Receive a packet, retry until error or timeout.
+  fn recv_timeout(&mut self, timeout: Duration) -> Result<T, E>;
 }

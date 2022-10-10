@@ -34,6 +34,10 @@ impl PacketReceiver<PhyPacket, ()> for PlainPHY {
   fn recv(&mut self) -> Result<PhyPacket, ()> {
     self.rx.recv()
   }
+
+  fn recv_timeout(&mut self, timeout: std::time::Duration) -> Result<PhyPacket, ()> {
+    self.rx.recv_timeout(timeout)
+  }
 }
 
 impl Default for PlainPHY {
