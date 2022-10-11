@@ -41,7 +41,7 @@ impl<const PACK_SIZE: usize> CrcSeq<PACK_SIZE> {
   /// add sequence number and checksum to a chunk of data,
   /// return a packet with crc+seq.  
   /// `data` must have exactly [`CrcSeq::DATA_SIZE`] bytes.
-  pub fn add(data: &[u8], seq: u8) -> Vec<u8> {
+  pub fn pack(data: &[u8], seq: u8) -> Vec<u8> {
     assert_eq!(data.len(), Self::DATA_SIZE);
     assert!(seq < SEQ_MOD);
     let mut packet = data.to_vec();
@@ -59,7 +59,7 @@ impl<const PACK_SIZE: usize> CrcSeq<PACK_SIZE> {
 
   /// try to extract the data packet and sequence number,
   /// if the data is corrupted, [`None`] is returned.
-  pub fn remove(packet: &[u8]) -> Option<(Vec<u8>, u8)> {
+  pub fn unpack(packet: &[u8]) -> Option<(Vec<u8>, u8)> {
     assert_eq!(packet.len(), PACK_SIZE);
     let mut packet = packet.to_vec();
     // extract the sequence number field

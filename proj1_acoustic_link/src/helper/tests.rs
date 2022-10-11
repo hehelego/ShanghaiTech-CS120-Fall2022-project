@@ -28,7 +28,7 @@ fn gen_pack() -> Vec<u8> {
   let mut data = vec![0; CS::DATA_SIZE];
   rng.fill_bytes(&mut data);
   let seq = rng.gen_range(0..4);
-  CS::add(&data, seq)
+  CS::pack(&data, seq)
 }
 fn flip_bit(data: &mut [u8]) {
   let mut rng = rand::thread_rng();
@@ -41,8 +41,8 @@ fn flip_bit(data: &mut [u8]) {
 fn crcseq_ok() {
   for _ in 0..CS_TESTS {
     let pack = gen_pack();
-    if let Some((data, seq)) = CS::remove(&pack) {
-      assert_eq!(CS::add(&data, seq), pack)
+    if let Some((data, seq)) = CS::unpack(&pack) {
+      assert_eq!(CS::pack(&data, seq), pack)
     } else {
       panic!("add-remove identity not hold failed");
     }
@@ -53,6 +53,6 @@ fn crcseq_err() {
   for _ in 0..CS_TESTS {
     let mut pack = gen_pack();
     flip_bit(&mut pack);
-    assert_eq!(CS::remove(&pack), None);
+    assert_eq!(CS::unpack(&pack), None);
   }
 }

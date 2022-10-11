@@ -42,14 +42,14 @@ impl AtomicPHY {
 impl PacketSender<PhyPacket, ()> for AtomicPHY {
   fn send(&mut self, packet: PhyPacket) -> Result<(), ()> {
     assert_eq!(packet.len(), Self::PACKET_BYTES);
-    let packet = CS::add(&packet, self.tx_seq);
+    let packet = CS::pack(&packet, self.tx_seq);
     self.tx_seq = (self.tx_seq + 1) % SEQ_MOD;
     self.txrx.send(packet)
   }
 }
 impl AtomicPHY {
   fn after_recv(&mut self, packet: PhyPacket) -> Result<(PhyPacket, u8), PacketError> {
-    if let Some((packet, seq)) = CS::remove(&packet) {
+    if let Some((packet, seq)) = CS::unpack(&packet) {
       let skip = (seq - self.rx_seq + SEQ_MOD) % SEQ_MOD;
       self.rx_seq = (seq + 1) % SEQ_MOD;
       Ok((packet, skip))
