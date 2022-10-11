@@ -22,7 +22,7 @@ const SEQ_BITS: usize = 2;
 /// number of bits for CRC checksum
 const CRC_BITS: usize = 14;
 /// the number of packets before the sequence number wraps around
-const SEQ_MOD: u8 = 1 << SEQ_BITS;
+pub const SEQ_MOD: u8 = 1 << SEQ_BITS;
 
 /// CRC + Sequence Number helper.  
 /// `PACK_SIZE`: total number bytes in one packet.
