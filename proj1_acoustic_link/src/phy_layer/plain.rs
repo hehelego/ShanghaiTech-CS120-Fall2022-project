@@ -1,8 +1,5 @@
 use super::common::*;
 
-type Tx = PhySender<Preamble, Codec_, OutStream, ()>;
-type Rx = PhyReceiver<Preamble, Codec_, FrameDetector<Preamble>, InStream, ()>;
-
 /// a physics layer peer object.
 /// send/recv packets with no latency/correctness guarantee.
 pub struct PlainPHY {
@@ -14,7 +11,7 @@ impl PlainPHY {
   /// number of bytes in one packet
   pub const PACKET_BYTES: usize = Codec_::BYTES_PER_PACKET;
   /// number of samples in one packet
-  pub const PACKET_SAMPLES: usize = Preamble::PREAMBLE_LEN + Codec_::SAMPLES_PER_PACKET;
+  pub const PACKET_SAMPLES: usize = Tx::SAMPLES_PER_PACKET;
 
   /// combine a sender and a receiver to get a physics layer object
   pub fn new(tx: Tx, rx: Rx) -> Self {
