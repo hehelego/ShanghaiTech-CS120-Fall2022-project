@@ -1,5 +1,6 @@
 use super::common::*;
-use crate::helper::CrcSeq;
+use super::PlainPHY;
+use crate::helper::{CrcSeq, SEQ_MOD};
 
 #[derive(Debug)]
 /// packet receive error
@@ -14,14 +15,14 @@ pub enum PacketError {
 
 /// An atomic physics layer: no partial failure.  
 /// packet lost/corrupt are detected
+#[derive(Default)]
 pub struct AtomicPHY {
-  tx: Tx,
+  txrx: PlainPHY,
   tx_seq: u8,
-  rx: Rx,
   rx_seq: u8,
 }
 
-type CS = CrcSeq<{ Codec_::BYTES_PER_PACKET }>;
+type CS = CrcSeq<{ PlainPHY::PACKET_BYTES }>;
 impl AtomicPHY {
   /// number of data bytes in one packet
   pub const PACKET_BYTES: usize = CS::DATA_SIZE;
@@ -29,19 +30,32 @@ impl AtomicPHY {
   pub const PACKET_SAMPLES: usize = Tx::SAMPLES_PER_PACKET;
 
   /// combine a sender and a receiver to get a physics layer object
-  pub fn new(tx: Tx, rx: Rx) -> Self {
+  pub fn new(txrx: PlainPHY) -> Self {
     Self {
-      tx,
+      txrx,
       tx_seq: 0,
-      rx,
       rx_seq: 0,
     }
   }
 }
 
 impl PacketSender<PhyPacket, ()> for AtomicPHY {
-  fn send(&mut self, mut packet: PhyPacket) -> Result<(), ()> {
-    todo!()
+  fn send(&mut self, packet: PhyPacket) -> Result<(), ()> {
+    assert_eq!(packet.len(), Self::PACKET_BYTES);
+    let packet = CS::add(&packet, self.tx_seq);
+    self.tx_seq = (self.tx_seq + 1) % SEQ_MOD;
+    self.txrx.send(packet)
+  }
+}
+impl AtomicPHY {
+  fn after_recv(&mut self, packet: PhyPacket) -> Result<(PhyPacket, u8), PacketError> {
+    if let Some((packet, seq)) = CS::remove(&packet) {
+      let skip = (seq - self.rx_seq + SEQ_MOD) % SEQ_MOD;
+      self.rx_seq = (seq + 1) % SEQ_MOD;
+      Ok((packet, skip))
+    } else {
+      Err(PacketError::Corrupt)
+    }
   }
 }
 impl PacketReceiver<(PhyPacket, u8), PacketError> for AtomicPHY {
@@ -49,19 +63,18 @@ impl PacketReceiver<(PhyPacket, u8), PacketError> for AtomicPHY {
   /// - the received packet and
   /// - the number of lost/corrupted packets since last success.
   fn recv(&mut self) -> Result<(PhyPacket, u8), PacketError> {
-    todo!()
+    if let Ok(packet) = self.txrx.recv() {
+      self.after_recv(packet)
+    } else {
+      Err(PacketError::NoPacketAvaiable)
+    }
   }
 
   fn recv_timeout(&mut self, timeout: std::time::Duration) -> Result<(PhyPacket, u8), PacketError> {
-    let now = std::time::Instant::now();
-    while now.elapsed() < timeout {
-      std::thread::yield_now();
-      match self.recv() {
-        Ok(pack_skip) => return Ok(pack_skip),
-        Err(PacketError::NoPacketAvaiable) => continue,
-        Err(e) => return Err(e),
-      }
+    if let Ok(packet) = self.txrx.recv_timeout(timeout) {
+      self.after_recv(packet)
+    } else {
+      Err(PacketError::NoPacketAvaiable)
     }
-    Err(PacketError::NoPacketAvaiable)
   }
 }
