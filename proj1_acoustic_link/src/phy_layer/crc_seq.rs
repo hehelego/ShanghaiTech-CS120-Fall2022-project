@@ -48,7 +48,9 @@ impl PacketSender<PhyPacket, ()> for AtomicPHY {
   }
 }
 impl AtomicPHY {
-  fn after_recv(&mut self, packet: PhyPacket) -> Result<(PhyPacket, u8), PacketError> {
+  /// verify data integrity with crc+seq,
+  /// return the data section and number of skipped packets
+  fn on_packet_arrived(&mut self, packet: PhyPacket) -> Result<(PhyPacket, u8), PacketError> {
     if let Some((packet, seq)) = CS::unpack(&packet) {
       let skip = (seq - self.rx_seq + SEQ_MOD) % SEQ_MOD;
       self.rx_seq = (seq + 1) % SEQ_MOD;
@@ -59,20 +61,28 @@ impl AtomicPHY {
   }
 }
 impl PacketReceiver<(PhyPacket, u8), PacketError> for AtomicPHY {
+  /// Receive a packet immediately.  
   /// Success: A tuple of
   /// - the received packet and
   /// - the number of lost/corrupted packets since last success.
+  /// Failed: [`PacketError`] type: no packet, packet corrupt, packet lost
   fn recv(&mut self) -> Result<(PhyPacket, u8), PacketError> {
     if let Ok(packet) = self.txrx.recv() {
-      self.after_recv(packet)
+      self.on_packet_arrived(packet)
     } else {
       Err(PacketError::NoPacketAvaiable)
     }
   }
 
+  /// Try to receive a packet before timeout.
+  /// This is the blocking version of [`AtomicPHY::recv`].  
+  /// Success: A tuple of
+  /// - the received packet and
+  /// - the number of lost/corrupted packets since last success.
+  /// Failed: [`PacketError`] type: no packet, packet corrupt, packet lost
   fn recv_timeout(&mut self, timeout: std::time::Duration) -> Result<(PhyPacket, u8), PacketError> {
     if let Ok(packet) = self.txrx.recv_timeout(timeout) {
-      self.after_recv(packet)
+      self.on_packet_arrived(packet)
     } else {
       Err(PacketError::NoPacketAvaiable)
     }
