@@ -1,6 +1,8 @@
-use proj1_acoustic_link::helper::{add_padding, bits_to_bytes, bytes_to_bits, remove_padding};
-use proj1_acoustic_link::phy_layer::PlainPHY;
-use proj1_acoustic_link::traits::{PacketReceiver, PacketSender};
+use proj1_acoustic_link::{
+  helper::*,
+  phy_layer::PlainPHY,
+  traits::{PacketReceiver, PacketSender},
+};
 use std::fs;
 use std::thread::sleep;
 use std::time::Duration;
@@ -16,15 +18,7 @@ fn part3_ck1_send() {
   let mut physics_layer = PlainPHY::default();
 
   let data_string = fs::read_to_string(FILEPATH).unwrap();
-  let bits: Vec<_> = data_string
-    .trim_end()
-    .chars()
-    .map(|x| match x {
-      '0' => 0,
-      '1' => 1,
-      _ => panic!("not a 0/1 bit"),
-    })
-    .collect();
+  let bits = chars_to_bits(data_string.trim_end());
 
   let mut bytes = bits_to_bytes(&bits);
   add_padding(&mut bytes, 0, CHUNK_LEN);
@@ -52,13 +46,6 @@ fn part3_ck1_recv() {
   remove_padding(&mut bytes, DATA_LEN, CHUNK_LEN);
 
   let bits = bytes_to_bits(&bytes);
-  let data_string: String = bits
-    .iter()
-    .map(|x| match x {
-      0 => '0',
-      1 => '1',
-      _ => panic!("not a 0/1 bit"),
-    })
-    .collect();
+  let data_string = bits_to_chars(&bits);
   fs::write(FILEPATH, data_string).unwrap();
 }
