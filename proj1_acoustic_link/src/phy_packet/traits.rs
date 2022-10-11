@@ -1,15 +1,5 @@
-use crate::traits::{PacketReceiver, PacketSender};
-
 /// PHY layers send/receive packets of type [`PhyPacket`], which is a fixed size bytes slice
 pub type PhyPacket = Vec<u8>;
-
-/// packet sender types that can send [`PhyPacket`]
-pub trait PhyPacketSender<E>: PacketSender<PhyPacket, E> {}
-impl<PS, E> PhyPacketSender<E> for PS where PS: PacketSender<PhyPacket, E> {}
-
-/// packet receiver types that can receive [`PhyPacket`]
-pub trait PhyPacketReceiver<E>: PacketReceiver<PhyPacket, E> {}
-impl<PR, E> PhyPacketReceiver<E> for PR where PR: PacketReceiver<PhyPacket, E> {}
 
 /// the sequence of PCM samples put at the begining of each [`PhyPacket`] in acoustic channel.
 pub type FramePreamble = Vec<f32>;

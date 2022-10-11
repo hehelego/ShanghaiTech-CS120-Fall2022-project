@@ -1,7 +1,6 @@
 use super::{traits::PhyPacket, Codec, FrameDetector, FramePayload, PreambleGen};
 use crate::{
-  sample_stream::{SampleInStream, SampleOutStream},
-  traits::{PacketReceiver, PacketSender},
+  traits::{InStream, OutStream, PacketReceiver, PacketSender},
   DefaultConfig,
 };
 use std::{
@@ -28,7 +27,7 @@ impl<PG, CC, SS, E> PhySender<PG, CC, SS, E>
 where
   PG: PreambleGen,
   CC: Codec,
-  SS: SampleOutStream<E>,
+  SS: OutStream<f32, E>,
 {
   pub fn new(stream_out: SS, codec: CC) -> Self {
     let preamble_samples = PG::generate().samples();
@@ -48,7 +47,7 @@ impl<PG, CC, SS, E> PacketSender<PhyPacket, E> for PhySender<PG, CC, SS, E>
 where
   PG: PreambleGen,
   CC: Codec,
-  SS: SampleOutStream<E>,
+  SS: OutStream<f32, E>,
 {
   /// frame = warm up + preamble + payload  
   /// - warm up: random samples whose absolute value is cloes to 1.0
@@ -86,7 +85,7 @@ where
   PG: PreambleGen,
   CC: Codec,
   FD: FrameDetector + Send + 'static,
-  SS: SampleInStream<E> + Send + 'static,
+  SS: InStream<f32, E> + Send + 'static,
   E: std::fmt::Debug,
 {
   /// A separated worker thread repeatedly do the procedure
@@ -131,17 +130,26 @@ where
   }
 }
 
-impl<PG, CC, FD, SS, E> PacketReceiver<PhyPacket, E> for PhyReceiver<PG, CC, FD, SS, E>
+impl<PG, CC, FD, SS, E> PacketReceiver<PhyPacket, ()> for PhyReceiver<PG, CC, FD, SS, E>
 where
   PG: PreambleGen,
   CC: Codec,
   FD: FrameDetector,
-  SS: SampleInStream<E>,
+  SS: InStream<f32, E>,
 {
   // receive frame from the channel and then demodulate the signal
-  fn recv(&mut self) -> Result<PhyPacket, E> {
-    let frame_payload = self.frame_payload_rx.recv().unwrap();
-    Ok(self.codec.decode(&frame_payload))
+  fn recv(&mut self) -> Result<PhyPacket, ()> {
+    match self.frame_payload_rx.try_recv() {
+      Ok(payload) => Ok(self.codec.decode(&payload)),
+      Err(_) => Err(()),
+    }
+  }
+
+  fn recv_timeout(&mut self, timeout: Duration) -> Result<PhyPacket, ()> {
+    match self.frame_payload_rx.recv_timeout(timeout) {
+      Ok(payload) => Ok(self.codec.decode(&payload)),
+      Err(_) => Err(()),
+    }
   }
 }
 

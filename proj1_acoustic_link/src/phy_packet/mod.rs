@@ -4,9 +4,9 @@
 /// Packet: a chunk of bytes.
 /// A packet is sent/received with no data integrity guarantee
 
-/// define the traits for physics layer
+/// define the types and traits related to physisc layer packet
 pub mod traits;
-pub use traits::{Codec, FramePayload, FrameDetector, PhyPacket, PhyPacketReceiver, PhyPacketSender, PreambleGen};
+pub use traits::{Codec, FrameDetector, FramePayload, PhyPacket, PreambleGen};
 
 /// implementors of [`FrameDetector`]: audio stream framing algorithms.
 pub mod frame_detect;
@@ -15,7 +15,7 @@ pub mod modulation;
 /// implementors of [`PreambleGen`]: preamble sequences.
 pub mod preambles;
 
-/// A systematic implementation of the physisc layer on audio PCM sample streams.  
-/// A [`PreambleGen`], a [`Codec`] and a [`FrameDetector`] together defines a PHY layer.  
-/// Implementors of [`PhyPacketSender`] and [`PhyPacketReceiver`] are provided.
-pub mod audio_phy_txrx;
+/// Bytes packet (packet type [`PhyPacket`]) transmission on audio PCM sample streams.  
+/// A sender can be built on a stream with a [`PreambleGen`] and a [`Codec`].  
+/// A receiver can be built on a stream with a [`PreambleGen`], a [`FrameDetector`] and a [`Codec`].  
+pub mod txrx;
