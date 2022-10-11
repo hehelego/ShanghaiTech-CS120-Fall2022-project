@@ -55,9 +55,11 @@ fn part4_recv() {
       Err(PacketError::NoPacketAvaiable) => break,
       Ok((packet, skips)) => {
         cur_chk += skips as usize;
+        println!("get packet[{}]", cur_chk);
         if cur_chk < chunks.len() {
           chunks[cur_chk] = Some(packet);
         }
+        cur_chk += 1;
       }
       Err(PacketError::Lost) => continue,
       Err(PacketError::Corrupt) => continue,
