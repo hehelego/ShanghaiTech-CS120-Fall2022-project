@@ -52,7 +52,7 @@ impl AtomicPHY {
   /// return the data section and number of skipped packets
   fn on_packet_arrived(&mut self, packet: PhyPacket) -> Result<(PhyPacket, u8), PacketError> {
     if let Some((packet, seq)) = CS::unpack(&packet) {
-      let skip = (seq - self.rx_seq + SEQ_MOD) % SEQ_MOD;
+      let skip = (SEQ_MOD + seq - self.rx_seq) % SEQ_MOD;
       self.rx_seq = (seq + 1) % SEQ_MOD;
       Ok((packet, skip))
     } else {
