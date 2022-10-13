@@ -14,5 +14,9 @@ pub use plain::PlainPHY;
 mod crc_seq;
 pub use crc_seq::{AtomicPHY, PacketError};
 
+/// PHY layer with OFDM+PSK modulation for higher bit rate
+mod ofdm;
+pub use ofdm::HighBpsPHY;
+
 /// the default PHY layer implementation is plain PHY
 pub use PlainPHY as PhyLayer;
