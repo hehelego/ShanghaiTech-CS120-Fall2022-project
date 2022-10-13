@@ -48,7 +48,7 @@ impl Codec for PSK {
   }
 }
 impl PSK {
-  fn new() -> Self {
+  pub fn new() -> Self {
     use std::f32::consts::TAU;
     let dt = 1.0 / Self::SAMPLE_RATE as f32;
     let zero: Vec<_> = (0..Self::SAMPLES_PER_SYMBOL)
@@ -68,54 +68,3 @@ impl Default for PSK {
   }
 }
 
-#[cfg(test)]
-mod tests {
-  use rand::{
-    distributions::{Standard, Uniform},
-    Rng,
-  };
-
-  use super::PSK;
-  use crate::phy_packet::Codec;
-
-  const MODEM_TESTS: usize = 1000;
-
-  /// PSK decode in an ideal channel
-  #[test]
-  fn psk_ideal() {
-    let mut modem = PSK::new();
-
-    for _ in 0..MODEM_TESTS {
-      let bytes: Vec<u8> = rand::thread_rng()
-        .sample_iter(Standard)
-        .take(PSK::BYTES_PER_PACKET)
-        .collect();
-
-      let encoded = modem.encode(&bytes);
-      let decoded = modem.decode(&encoded);
-      assert_eq!(bytes.as_slice(), decoded.as_slice());
-    }
-  }
-
-  /// PSK decode in noisy channel, where the noise is distributed as Uniform(-1,+1).
-  #[test]
-  fn psk_noise() {
-    let mut modem = PSK::new();
-
-    for _ in 0..MODEM_TESTS {
-      let bytes: Vec<u8> = rand::thread_rng()
-        .sample_iter(Standard)
-        .take(PSK::BYTES_PER_PACKET)
-        .collect();
-
-      let encoded = modem.encode(&bytes);
-      let received: Vec<f32> = encoded
-        .into_iter()
-        .zip(rand::thread_rng().sample_iter(Uniform::new(-1.0, 1.0)))
-        .map(|(x, y)| x + y)
-        .collect();
-      let decoded = modem.decode(&received);
-      assert_eq!(bytes.as_slice(), decoded.as_slice());
-    }
-  }
-}

@@ -3,3 +3,6 @@ pub use ofdm::OFDM;
 
 mod psk;
 pub use psk::PSK;
+
+#[cfg(test)]
+mod tests;
