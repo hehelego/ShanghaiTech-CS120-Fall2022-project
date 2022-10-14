@@ -57,7 +57,7 @@ mod wired_tests {
 
       // the payload: exactly one frame will be found
       for i in 0..PL_LEN * 2 {
-      let v = FP::from_f32(0.33 * i as f32).sin();
+        let v = FP::from_f32(0.33 * i as f32).sin();
         if detector.on_sample(v).is_some() {
           println!("detected {}/{}", i, PL_LEN);
           s += 1;
@@ -121,7 +121,11 @@ mod wired_tests {
     hound_in_stream.read_exact(&mut buf).unwrap();
     for x in buf.iter() {
       if let Some(payload_recv) = detector.on_sample(*x) {
-        assert_eq!(&payload_recv, &payload[..PL_LEN]);
+        let dist = payload_recv
+          .iter()
+          .zip(payload[..PL_LEN].iter())
+          .fold(0.0, |s, (x, y)| s + FP::into_f32(x - y) * FP::into_f32(x - y));
+        assert!(dist < 1e-8);
         s += 1;
       }
     }
@@ -155,7 +159,11 @@ mod wired_tests {
       }
       for x in buf.iter() {
         if let Some(payload_recv) = detector.on_sample(*x) {
-          assert_eq!(&payload_recv, &payload[..PL_LEN]);
+          let dist = payload_recv
+            .iter()
+            .zip(payload[..PL_LEN].iter())
+            .fold(0.0, |s, (x, y)| s + FP::into_f32(x - y) * FP::into_f32(x - y));
+          assert!(dist < 1e-8);
           s += 1;
         }
       }
@@ -169,7 +177,7 @@ mod wireless_tests {
   use crate::phy_packet::{frame_detect::CorrelationFraming, preambles::ChirpUpDown, FrameDetector};
   use crate::sample_stream::CpalInStream;
   use crate::traits::InStream;
-  use crate::traits::FP;
+  use crate::traits::{Sample, FP};
 
   #[test]
   fn corr_detect_air_recv() {
