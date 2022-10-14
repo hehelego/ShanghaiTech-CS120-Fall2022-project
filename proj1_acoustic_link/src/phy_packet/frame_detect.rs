@@ -68,6 +68,10 @@ impl PreambleWindow {
     self.smooth_power = FP::ZERO;
     self.square_sum = FP::ZERO;
   }
+
+  pub fn enough_power(&self) -> bool {
+    self.smooth_power > FP::ZERO && self.square_sum > FP::ZERO
+  }
 }
 
 struct Payload {
@@ -144,10 +148,9 @@ where
   fn detect_preamble_start(&mut self, sample: FP) -> FramingState {
     self.detect_window.update(sample);
     // Not enough samples
-    if self.detect_window.len() < self.preamble_gen.len() {
+    if self.detect_window.len() < self.preamble_gen.len() || !self.detect_window.enough_power() {
       return FramingState::DetectPreambleStart;
     }
-    println!("before calling calc, detect window: {:?}", self.detect_window.buffer);
     // To check if is the beginning of the preamble
     let (corr2pwr, cosine_sim) = self.calculate_relations();
     if corr2pwr >= Self::CORR_TO_PWR_MIN && cosine_sim >= Self::COSINE_MIN {
@@ -206,8 +209,6 @@ where
   fn calculate_relations(&self) -> (FP, FP) {
     let dot = dot_product(self.detect_window.iter(), self.preamble_gen.iter());
     let corr2pwr = (dot / FP::from_f32(self.preamble_gen.len() as f32)) / self.detect_window.smooth_power;
-    assert_ne!(self.preamble_gen.norm(), FP::ZERO);
-    assert_ne!(self.detect_window.norm(), FP::ZERO);
     let cosine_sim = dot / self.preamble_gen.norm() / self.detect_window.norm();
     (corr2pwr, cosine_sim)
   }
