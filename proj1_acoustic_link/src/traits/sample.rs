@@ -80,7 +80,7 @@ impl Sample for FixedPoint {
   const ZERO: Self = Self::ZERO;
 
   fn sqrt(self) -> Self {
-    fixed_sqrt::FixedSqrt::sqrt(self)
+    cordic::sqrt(self)
   }
   fn sin(self) -> Self {
     cordic::sin(self)

@@ -1,6 +1,6 @@
 use super::{traits::PhyPacket, Codec, FrameDetector, FramePayload, PreambleGen};
 use crate::{
-  traits::{InStream, OutStream, PacketReceiver, PacketSender, FP},
+  traits::{InStream, OutStream, PacketReceiver, PacketSender, FP, Sample},
   DefaultConfig,
 };
 use std::{
@@ -99,7 +99,7 @@ where
       Duration::from_secs_f32(8.0 * DefaultConfig::BUFFER_SIZE as f32 / DefaultConfig::SAMPLE_RATE as f32);
     let last_fetch = Instant::now() - fetch_interval;
     // TODO: select a proper buffer size
-    let mut buf = [FP::ZERO; DefaultConfig::BUFFER_SIZE * 8];
+    let mut buf = [Sample::ZERO; DefaultConfig::BUFFER_SIZE * 8];
     while exit_rx.try_recv().is_err() {
       if last_fetch.elapsed() > fetch_interval {
         let n = stream_in.read(&mut buf).unwrap();

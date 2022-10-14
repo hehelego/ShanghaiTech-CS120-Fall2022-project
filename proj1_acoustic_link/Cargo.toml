@@ -14,7 +14,6 @@ crc = "3.0"
 reed-solomon-erasure = "6.0"
 az = "1.2.1"
 fixed = "1.19"
-fixed-sqrt = "0.2.5"
 cordic = "0.1.5"
 
 # using air-gapped transmission or wired transmission

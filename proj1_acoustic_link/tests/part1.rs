@@ -1,4 +1,4 @@
-use proj1_acoustic_link::traits::FP;
+use proj1_acoustic_link::traits::{Sample, FP};
 use std::time::Duration;
 
 use proj1_acoustic_link::{
