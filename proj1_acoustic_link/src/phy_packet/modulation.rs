@@ -1,4 +1,5 @@
 use crate::helper::{bits_to_bytes, bytes_to_bits, dot_product};
+use crate::traits::{Sample, FP};
 
 use super::{Codec, FramePayload, PhyPacket};
 
@@ -8,7 +9,7 @@ use super::{Codec, FramePayload, PhyPacket};
 /// - fixed frequency carrier, 0/pi phases
 /// - dot product + integration for demodulation
 pub struct PSK {
-  symbols: [Vec<f32>; 2],
+  symbols: [Vec<FP>; 2],
 }
 impl PSK {
   /// sampling rate of the digital signal
@@ -35,7 +36,7 @@ impl Codec for PSK {
     frame
   }
 
-  fn decode(&mut self, samples: &[f32]) -> PhyPacket {
+  fn decode(&mut self, samples: &[FP]) -> PhyPacket {
     assert_eq!(samples.len(), Self::SAMPLES_PER_PACKET);
 
     let mut bits = Vec::with_capacity(Self::SYMBOLS_PER_PACKET);
@@ -49,12 +50,11 @@ impl Codec for PSK {
 }
 impl PSK {
   fn new() -> Self {
-    use std::f32::consts::TAU;
-    let dt = 1.0 / Self::SAMPLE_RATE as f32;
+    let dt = FP::ONE / FP::from_f32(Self::SAMPLE_RATE as f32);
     let zero: Vec<_> = (0..Self::SAMPLES_PER_SYMBOL)
       .map(|i| {
-        let t = dt * i as f32;
-        (TAU * Self::CARRIER_FREQ * t).sin()
+        let t = dt * FP::from_f32(i as f32);
+        (FP::TAU * FP::from_f32(Self::CARRIER_FREQ) * t).sin()
       })
       .collect();
     let one: Vec<_> = zero.iter().map(|x| -x).collect();
@@ -79,6 +79,7 @@ mod tests {
 
   use super::PSK;
   use crate::phy_packet::Codec;
+  use crate::traits::{Sample, FP};
 
   const MODEM_TESTS: usize = 1000;
 
@@ -111,10 +112,10 @@ mod tests {
         .collect();
 
       let encoded = modem.encode(&bytes);
-      let received: Vec<f32> = encoded
+      let received: Vec<FP> = encoded
         .into_iter()
         .zip(rand::thread_rng().sample_iter(Uniform::new(-1.0, 1.0)))
-        .map(|(x, y)| x + y)
+        .map(|(x, y)| x + FP::from_f32(y))
         .collect();
       let decoded = modem.decode(&received);
       assert_eq!(bytes.as_slice(), decoded.as_slice());

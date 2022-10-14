@@ -1,11 +1,11 @@
-use fixed::types::I20F12;
 use std::cmp::{PartialEq, PartialOrd};
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 
-pub type FixedPoint = I20F12;
+// pub type FixedPoint = fixed::types::I20F12;
+pub type FixedPoint = fixed::types::I32F32;
 
 #[cfg(feature = "nofloat")]
-pub type FP = fixed::types::I20F12;
+pub type FP = FixedPoint;
 #[cfg(not(feature = "nofloat"))]
 pub type FP = f32;
 
