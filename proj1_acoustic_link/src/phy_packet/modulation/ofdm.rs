@@ -23,14 +23,15 @@ impl OFDM {
   /// number of samples in one symbol
   pub const SAMPLES_PER_SYMBOL: usize = Self::N + Self::M;
   /// number of bits in one packet
-  pub const SYMBOLS_PER_PACKET: usize = 18;
+  pub const ENCODE_SYMBOLS: usize = 24;
+  pub const SYMBOLS_PER_PACKET: usize = Self::ENCODE_SYMBOLS + 1;
 
   /// size of FFT/IFFT
   pub const N: usize = 64;
   /// samples in the cyclic prefix
-  pub const M: usize = 16;
+  pub const M: usize = 8;
   /// first encoding frequency point
-  pub const START: usize = 5;
+  pub const START: usize = 7;
 
   // for fft scaling
   const UNIT: f32 = 1.0 / 4.0;
@@ -59,7 +60,7 @@ impl OFDM {
     copy(cp.iter_mut(), buf[Self::N - Self::M..].iter().map(|x| x.re));
     copy(symbol.iter_mut(), buf.iter().map(|x| x.re));
   }
-  fn decode_symbol(&self, buf: &mut [Complex], symbol: &[f32], bits: &mut [u8]) {
+  fn decode_symbol(&self, buf: &mut [Complex], symbol: &[f32], bits: &mut [u8], train_arg: &[f32]) {
     buf.iter_mut().for_each(|x| *x = Complex::default());
     let (_cp, symbol) = symbol.split_at(Self::M);
 
@@ -67,10 +68,25 @@ impl OFDM {
     self.fft.process(buf);
 
     for (i, bit) in bits.iter_mut().enumerate() {
+      let offset = Complex::exp(-Complex::new(0.0, 1.0) * train_arg[i]);
       let j = Self::START + i;
-      let val = buf[j].re;
+      let val = (buf[j] * offset).re;
       *bit = if val > 0.0 { 0 } else { 1 };
     }
+  }
+  fn train(&self, buf: &mut [Complex], symbol: &[f32]) -> Vec<f32> {
+    buf.iter_mut().for_each(|x| *x = Complex::default());
+    let (_cp, symbol) = symbol.split_at(Self::M);
+
+    copy(buf.iter_mut(), symbol.iter().map(|x| Complex::new(*x, 0.0)));
+    self.fft.process(buf);
+
+    let mut train_arg = vec![0.0; Self::BITS_PER_SYMBOL];
+    for (i, arg) in train_arg.iter_mut().enumerate() {
+      let j = Self::START + i;
+      *arg = buf[j].arg();
+    }
+    train_arg
   }
 }
 
@@ -81,7 +97,7 @@ impl Default for OFDM {
 }
 
 impl Codec for OFDM {
-  const BYTES_PER_PACKET: usize = OFDM::SYMBOLS_PER_PACKET * OFDM::BITS_PER_SYMBOL / 8;
+  const BYTES_PER_PACKET: usize = OFDM::ENCODE_SYMBOLS * OFDM::BITS_PER_SYMBOL / 8;
   const SAMPLES_PER_PACKET: usize = OFDM::SYMBOLS_PER_PACKET * OFDM::SAMPLES_PER_SYMBOL;
 
   fn encode(&mut self, bytes: &[u8]) -> FramePayload {
@@ -89,9 +105,11 @@ impl Codec for OFDM {
 
     let mut frame = vec![0.0; Self::SAMPLES_PER_PACKET];
     let mut buf = [Complex::default(); Self::N];
+    let mut bits = vec![0; Self::BITS_PER_SYMBOL];
+    bits.extend(bytes_to_bits(bytes));
     frame
       .chunks_exact_mut(Self::SAMPLES_PER_SYMBOL)
-      .zip(bytes_to_bits(bytes).chunks_exact(Self::BITS_PER_SYMBOL))
+      .zip(bits.chunks_exact(Self::BITS_PER_SYMBOL))
       .for_each(|(symbol, bits)| self.encode_symbol(&mut buf, symbol, bits));
     frame
   }
@@ -99,12 +117,16 @@ impl Codec for OFDM {
   fn decode(&mut self, samples: &[f32]) -> PhyPacket {
     assert_eq!(samples.len(), Self::SAMPLES_PER_PACKET);
 
-    let mut bits = [0; OFDM::SYMBOLS_PER_PACKET * OFDM::BITS_PER_SYMBOL];
     let mut buf = [Complex::default(); Self::N];
+
+    let (train_samples, samples) = samples.split_at(Self::SAMPLES_PER_SYMBOL);
+    let train_arg = self.train(&mut buf, &train_samples);
+
+    let mut bits = [0; OFDM::ENCODE_SYMBOLS * OFDM::BITS_PER_SYMBOL];
     samples
       .chunks_exact(Self::SAMPLES_PER_SYMBOL)
       .zip(bits.chunks_exact_mut(Self::BITS_PER_SYMBOL))
-      .for_each(|(symbol, bits)| self.decode_symbol(&mut buf, symbol, bits));
+      .for_each(|(symbol, bits)| self.decode_symbol(&mut buf, symbol, bits, &train_arg));
     bits_to_bytes(&bits)
   }
 }
