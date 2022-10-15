@@ -19,7 +19,7 @@ pub struct OFDM {
 }
 impl OFDM {
   /// number of bits in one symbol
-  pub const BITS_PER_SYMBOL: usize = 4;
+  pub const BITS_PER_SYMBOL: usize = 3;
   /// number of samples in one symbol
   pub const SAMPLES_PER_SYMBOL: usize = Self::N + Self::M;
   /// number of bits in one packet
