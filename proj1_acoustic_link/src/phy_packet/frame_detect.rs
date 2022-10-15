@@ -1,5 +1,6 @@
 use super::{FrameDetector, FramePayload, PreambleGen};
 use crate::helper::dot_product;
+use crate::traits::{Sample, FP};
 use std::collections::VecDeque;
 
 // State for CorraltionFraming
@@ -12,13 +13,13 @@ enum FramingState {
 
 // Window for store the samples temporarily.
 struct PreambleWindow {
-  buffer: VecDeque<f32>,
+  buffer: VecDeque<FP>,
   // The two index will continous increase during one detection session, and reset to zero after detecting one package.
   head_index: usize,
   tail_index: usize,
   capacity: usize,
-  smooth_power: f32,
-  square_sum: f32,
+  smooth_power: FP,
+  square_sum: FP,
 }
 
 impl PreambleWindow {
@@ -28,25 +29,26 @@ impl PreambleWindow {
       buffer: VecDeque::new(),
       head_index: 0,
       tail_index: 0,
-      smooth_power: 0.0,
-      square_sum: 0.0,
+      smooth_power: FP::ZERO,
+      square_sum: FP::ZERO,
       capacity,
     }
   }
   pub fn len(&self) -> usize {
     self.buffer.len()
   }
-  pub fn iter(&self) -> impl ExactSizeIterator<Item = &'_ f32> {
+  pub fn iter(&self) -> impl ExactSizeIterator<Item = &'_ FP> {
     self.buffer.iter()
   }
-  pub fn norm(&self) -> f32 {
+  pub fn norm(&self) -> FP {
     self.square_sum.sqrt()
   }
-  pub fn update(&mut self, sample: f32) {
+  pub fn update(&mut self, sample: FP) {
     self.tail_index += 1;
     self.buffer.push_back(sample);
     self.square_sum += sample * sample;
-    self.smooth_power = self.smooth_power * 63.0 / 64.0 + sample * sample / 64.0;
+    self.smooth_power =
+      self.smooth_power * FP::from_f32(63.0) / FP::from_f32(64.0) + sample * sample / FP::from_f32(64.0);
     // Pop the steal sample
     if self.buffer.len() > self.capacity {
       let old_sample = self.buffer.pop_front().unwrap();
@@ -55,7 +57,7 @@ impl PreambleWindow {
     }
   }
   // Extract the samples from `index + 1` to the end of the buffer.
-  pub fn extract_samples_to_end(&mut self, index: usize) -> Vec<f32> {
+  pub fn extract_samples_to_end(&mut self, index: usize) -> Vec<FP> {
     let start = index - self.head_index;
     self.buffer.range(start..).cloned().collect()
   }
@@ -63,13 +65,17 @@ impl PreambleWindow {
     self.buffer.clear();
     self.head_index = 0;
     self.tail_index = 0;
-    self.smooth_power = 0.0;
-    self.square_sum = 0.0;
+    self.smooth_power = FP::ZERO;
+    self.square_sum = FP::ZERO;
+  }
+
+  pub fn enough_power(&self) -> bool {
+    self.smooth_power > FP::ZERO && self.square_sum > FP::ZERO
   }
 }
 
 struct Payload {
-  buffer: Vec<f32>,
+  buffer: Vec<FP>,
   size: usize,
 }
 
@@ -80,11 +86,11 @@ impl Payload {
       size: SIZE,
     }
   }
-  pub fn extend(&mut self, samples: Vec<f32>) {
+  pub fn extend(&mut self, samples: Vec<FP>) {
     assert!(samples.len() <= self.size);
     self.buffer.extend(samples.iter())
   }
-  pub fn update(&mut self, sample: f32) -> Option<Vec<f32>> {
+  pub fn update(&mut self, sample: FP) -> Option<Vec<FP>> {
     self.buffer.push(sample);
     if self.buffer.len() == self.size {
       let frame = self.buffer.clone();
@@ -102,7 +108,7 @@ pub struct CorrelationFraming<PG: PreambleGen> {
   detect_window: PreambleWindow,
   frame_payload: Payload,
   corr_peak_index: usize,
-  corr_peak_value: f32,
+  corr_peak_value: FP,
 }
 
 impl<PG> CorrelationFraming<PG>
@@ -133,16 +139,16 @@ where
       state: FramingState::DetectPreambleStart,
       frame_payload: Payload::new::<PAYLOAD_LEN>(),
       corr_peak_index: 0,
-      corr_peak_value: 0.0,
+      corr_peak_value: FP::ZERO,
       preamble_gen,
     }
   }
 
   // detect the start of preamble. After the checks passed, it will enter detect rising edge state.
-  fn detect_preamble_start(&mut self, sample: f32) -> FramingState {
+  fn detect_preamble_start(&mut self, sample: FP) -> FramingState {
     self.detect_window.update(sample);
     // Not enough samples
-    if self.detect_window.len() < self.preamble_gen.len() {
+    if self.detect_window.len() < self.preamble_gen.len() || !self.detect_window.enough_power() {
       return FramingState::DetectPreambleStart;
     }
     // To check if is the beginning of the preamble
@@ -159,7 +165,7 @@ where
   }
 
   // Try to find the peak of the preamble. If it starts falling, it will enter detect falling edge.
-  fn detect_rising_edge(&mut self, sample: f32) -> FramingState {
+  fn detect_rising_edge(&mut self, sample: FP) -> FramingState {
     self.detect_window.update(sample);
     // Get the data.
     let (corr2pwr, cosine_sim) = self.calculate_relations();
@@ -172,7 +178,7 @@ where
     FramingState::DetectRisingEdge
   }
 
-  fn detect_falling_edge(&mut self, sample: f32) -> FramingState {
+  fn detect_falling_edge(&mut self, sample: FP) -> FramingState {
     self.detect_window.update(sample);
     // If we have found the tail.
     if self.detect_window.tail_index - self.corr_peak_index > Self::AFTER_PEAK_SAMPLES {
@@ -188,7 +194,7 @@ where
     }
   }
 
-  fn wait_payload(&mut self, sample: f32) -> (FramingState, Option<FramePayload>) {
+  fn wait_payload(&mut self, sample: FP) -> (FramingState, Option<FramePayload>) {
     // assert!(self.frame_payload.len() < self.frame_payload.capacity());
     // append the newly found sample into the payload window
     if let Some(payload) = self.frame_payload.update(sample) {
@@ -200,9 +206,9 @@ where
   }
 
   // Calculate the relations between preamble and samples. Return the ratio of correlation power to the received signal average power and cosine similarity.
-  fn calculate_relations(&self) -> (f32, f32) {
+  fn calculate_relations(&self) -> (FP, FP) {
     let dot = dot_product(self.detect_window.iter(), self.preamble_gen.iter());
-    let corr2pwr = (dot / self.preamble_gen.len() as f32) / self.detect_window.smooth_power;
+    let corr2pwr = (dot / FP::from_f32(self.preamble_gen.len() as f32)) / self.detect_window.smooth_power;
     let cosine_sim = dot / self.preamble_gen.norm() / self.detect_window.norm();
     (corr2pwr, cosine_sim)
   }
@@ -210,7 +216,7 @@ where
   // reset the fields relatated to preable detection.
   fn reset_detection_state(&mut self) {
     self.detect_window.clear();
-    self.corr_peak_value = 0.0;
+    self.corr_peak_value = FP::ZERO;
     self.corr_peak_index = 0;
   }
 }
@@ -219,7 +225,7 @@ impl<PG> FrameDetector for CorrelationFraming<PG>
 where
   PG: PreambleGen,
 {
-  fn on_sample(&mut self, sample: f32) -> Option<FramePayload> {
+  fn on_sample(&mut self, sample: FP) -> Option<FramePayload> {
     match self.state {
       FramingState::WaitPayload => {
         let (state, frame) = self.wait_payload(sample);

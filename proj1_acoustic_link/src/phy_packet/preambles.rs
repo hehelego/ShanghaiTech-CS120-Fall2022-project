@@ -1,12 +1,13 @@
 use crate::helper::chirp;
+use crate::traits::{Sample, FP};
 
 use super::{traits::FramePreamble, PreambleGen};
 
 /// an chirp signal preamble sequence, the frequency goes up then down.  
 /// **NOTE** Due to lack of rustc features, the following parameters are not configurable.  
 pub struct ChirpUpDown {
-  samples: Vec<f32>,
-  norm: f32,
+  samples: Vec<FP>,
+  norm: FP,
 }
 
 impl ChirpUpDown {
@@ -20,21 +21,21 @@ impl ChirpUpDown {
   pub const FS: usize = 48000;
 
   pub fn new() -> ChirpUpDown {
-    let fa = ChirpUpDown::FA;
-    let fb = ChirpUpDown::FB;
+    let fa = FP::from_f32(ChirpUpDown::FA);
+    let fb = FP::from_f32(ChirpUpDown::FB);
     let m = ChirpUpDown::N / 2;
     let fs = ChirpUpDown::FS;
 
-    let samples: Vec<f32> = chirp(fa, fb, m, fs).chain(chirp(fb, fa, m, fs)).collect();
-    let norm = samples.iter().fold(0.0, |s, &x| s + x * x).sqrt();
+    let samples: Vec<FP> = chirp(fa, fb, m, fs).chain(chirp(fb, fa, m, fs)).collect();
+    let norm = samples.iter().fold(FP::ZERO, |s, &x| s + x * x).sqrt();
     Self { samples, norm }
   }
 }
 
 impl Default for ChirpUpDown {
-    fn default() -> Self {
-        Self::new()
-    }
+  fn default() -> Self {
+    Self::new()
+  }
 }
 
 impl PreambleGen for ChirpUpDown {
@@ -43,13 +44,13 @@ impl PreambleGen for ChirpUpDown {
   fn samples(&self) -> FramePreamble {
     self.samples.clone()
   }
-  fn iter(&self) -> std::slice::Iter<f32> {
+  fn iter(&self) -> std::slice::Iter<FP> {
     self.samples.iter()
   }
   fn len(&self) -> usize {
     self.samples.len()
   }
-  fn norm(&self) -> f32 {
+  fn norm(&self) -> FP {
     self.norm
   }
 

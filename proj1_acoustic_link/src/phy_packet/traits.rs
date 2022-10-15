@@ -1,10 +1,11 @@
+use crate::traits::FP;
 /// PHY layers send/receive packets of type [`PhyPacket`], which is a fixed size bytes slice
 pub type PhyPacket = Vec<u8>;
 
 /// the sequence of PCM samples put at the begining of each [`PhyPacket`] in acoustic channel.
-pub type FramePreamble = Vec<f32>;
+pub type FramePreamble = Vec<FP>;
 /// the sequence of PCM samples used to encode bytes of a [`PhyPacket`] in acoustic channel.
-pub type FramePayload = Vec<f32>;
+pub type FramePayload = Vec<FP>;
 
 /// types that can generate preamble sequence
 pub trait PreambleGen {
@@ -13,10 +14,10 @@ pub trait PreambleGen {
 
   /// generate the preamble samples, should contain exactly [`Self::PREAMBLE_LEN`] samples.
   fn samples(&self) -> FramePreamble;
-  fn norm(&self) -> f32;
+  fn norm(&self) -> FP;
   fn len(&self) -> usize;
   fn generate() -> Self;
-  fn iter(&self) -> std::slice::Iter<f32>;
+  fn iter(&self) -> std::slice::Iter<FP>;
 }
 
 /// type traits for encoding/decoding [`PhyPacket`]
@@ -33,12 +34,12 @@ pub trait Codec: Default {
   /// Decode a chunk of bytes from a sequence of PCM samples.  
   /// The given sequence should have exactly [`Self::SAMPLES_PER_PACKET`] samples.
   /// The return data should have exactly [`Self::BYTES_PER_PACKET`] bytes.
-  fn decode(&mut self, samples: &[f32]) -> PhyPacket;
+  fn decode(&mut self, samples: &[FP]) -> PhyPacket;
 }
 
 /// type traits for frame detector strategy
 pub trait FrameDetector {
   /// Update the detector state when a new sample is received.  
   /// Return the a frame payload section if we detect any frame.
-  fn on_sample(&mut self, sample: f32) -> Option<FramePayload>;
+  fn on_sample(&mut self, sample: FP) -> Option<FramePayload>;
 }

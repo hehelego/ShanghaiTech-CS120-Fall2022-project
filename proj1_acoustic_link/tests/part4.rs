@@ -2,11 +2,9 @@ use proj1_acoustic_link::{
   helper::*,
   phy_layer::AtomicPHY,
   phy_layer::PacketError,
-  phy_packet::PhyPacket,
   traits::{PacketReceiver, PacketSender},
 };
 use reed_solomon_erasure::{galois_8::Field, ReedSolomon};
-use std::fs::{read_to_string, write as write_string};
 use std::thread::sleep;
 use std::time::Duration;
 
@@ -22,7 +20,7 @@ const TOTAL_CHUNKS: usize = DATA_CHUNKS + ECC_CHUNKS;
 fn part4_send() {
   // read bits, pad data
   const FILE_PATH: &str = "INPUT.txt";
-  let data_string = read_to_string(FILE_PATH).unwrap();
+  let data_string = std::fs::read_to_string(FILE_PATH).unwrap();
   let bits = chars_to_bits(data_string.trim_end());
   let mut bytes = bits_to_bytes(&bits);
   add_padding(&mut bytes, 0, CHUNK_LEN);

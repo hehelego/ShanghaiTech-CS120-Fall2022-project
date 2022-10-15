@@ -1,3 +1,4 @@
+use proj1_acoustic_link::traits::{Sample, FP};
 use std::time::Duration;
 
 use proj1_acoustic_link::{
@@ -14,7 +15,7 @@ pub fn part1_ck1() {
   // record duration
   const RECDURATION: u64 = 10;
   // buffer transfer data between in stream and out stream.
-  let mut buf = [0.0; BUFSIZE];
+  let mut buf = [FP::ZERO; BUFSIZE];
   // Create cpal_in_stream and record for RECDURATION.
   let mut cpal_in_stream = CpalInStream::default();
   std::thread::sleep(std::time::Duration::from_secs(RECDURATION));
@@ -32,7 +33,7 @@ pub fn part1_ck1() {
 pub fn part1_ck2() {
   const RECDURATION: u64 = 10;
   const FILENAME: &str = "winter.wav";
-  let mut buf = [0.0; DefaultConfig::BUFFER_SIZE];
+  let mut buf = [FP::ZERO; DefaultConfig::BUFFER_SIZE];
   let mut hound_in_stream = HoundInStream::open(FILENAME);
   let mut cpal_out_stream = CpalOutStream::default();
   let mut cpal_in_stream = CpalInStream::default();

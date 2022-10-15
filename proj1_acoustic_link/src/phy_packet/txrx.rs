@@ -1,6 +1,6 @@
 use super::{traits::PhyPacket, Codec, FrameDetector, FramePayload, PreambleGen};
 use crate::{
-  traits::{InStream, OutStream, PacketReceiver, PacketSender},
+  traits::{InStream, OutStream, PacketReceiver, PacketSender, FP, Sample},
   DefaultConfig,
 };
 use std::{
@@ -18,7 +18,7 @@ use std::{
 pub struct PhySender<PG, CC, SS, E> {
   _pg: PhantomData<PG>,
   _err: PhantomData<E>,
-  preamble_samples: Vec<f32>,
+  preamble_samples: Vec<FP>,
   codec: CC,
   stream_out: SS,
 }
@@ -27,7 +27,7 @@ impl<PG, CC, SS, E> PhySender<PG, CC, SS, E>
 where
   PG: PreambleGen,
   CC: Codec,
-  SS: OutStream<f32, E>,
+  SS: OutStream<FP, E>,
 {
   pub fn new(stream_out: SS, codec: CC) -> Self {
     let preamble_samples = PG::generate().samples();
@@ -47,7 +47,7 @@ impl<PG, CC, SS, E> PacketSender<PhyPacket, E> for PhySender<PG, CC, SS, E>
 where
   PG: PreambleGen,
   CC: Codec,
-  SS: OutStream<f32, E>,
+  SS: OutStream<FP, E>,
 {
   /// frame = warm up + preamble + payload  
   /// - warm up: random samples whose absolute value is cloes to 1.0
@@ -85,7 +85,7 @@ where
   PG: PreambleGen,
   CC: Codec,
   FD: FrameDetector + Send + 'static,
-  SS: InStream<f32, E> + Send + 'static,
+  SS: InStream<FP, E> + Send + 'static,
   E: std::fmt::Debug,
 {
   /// A separated worker thread repeatedly do the procedure
@@ -99,7 +99,7 @@ where
       Duration::from_secs_f32(8.0 * DefaultConfig::BUFFER_SIZE as f32 / DefaultConfig::SAMPLE_RATE as f32);
     let last_fetch = Instant::now() - fetch_interval;
     // TODO: select a proper buffer size
-    let mut buf = [0.0; DefaultConfig::BUFFER_SIZE * 8];
+    let mut buf = [Sample::ZERO; DefaultConfig::BUFFER_SIZE * 8];
     while exit_rx.try_recv().is_err() {
       if last_fetch.elapsed() > fetch_interval {
         let n = stream_in.read(&mut buf).unwrap();
@@ -135,7 +135,7 @@ where
   PG: PreambleGen,
   CC: Codec,
   FD: FrameDetector,
-  SS: InStream<f32, E>,
+  SS: InStream<FP, E>,
 {
   // receive frame from the channel and then demodulate the signal
   fn recv(&mut self) -> Result<PhyPacket, ()> {

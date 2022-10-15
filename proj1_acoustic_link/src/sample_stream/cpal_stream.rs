@@ -9,17 +9,19 @@ use crate::{
   DefaultConfig,
 };
 
+use crate::traits::{Sample, FP};
+
 /// An input stream built on cpal input stream. Support reading PCM samples.
 /// The `CpalInStream` fetch samples from a `cpal::Stream`
 pub struct CpalInStream {
   stream: cpal::Stream,
-  buffer: ConcurrentBuffer<f32>,
+  buffer: ConcurrentBuffer<FP>,
 }
 /// An output stream built on cpal output stream. Support writing PCM samples.
 /// The `CpalOutStream` write samples to a `cpal::Stream`
 pub struct CpalOutStream {
   stream: cpal::Stream,
-  buffer: ConcurrentBuffer<f32>,
+  buffer: ConcurrentBuffer<FP>,
 }
 
 impl CpalInStream {
@@ -28,11 +30,12 @@ impl CpalInStream {
   pub fn new(input_device: Device, stream_config: StreamConfig) -> Result<Self, BuildStreamError> {
     // the callback function  periodically fetch samples
     // from the stream and push them into the buffer
-    let buffer: ConcurrentBuffer<f32> = Default::default();
+    let buffer: ConcurrentBuffer<FP> = Default::default();
     let mut bf = buffer.clone();
+    let mut cast_buf = vec![FP::ZERO; DefaultConfig::BUFFER_SIZE];
     let stream = input_device.build_input_stream(
       &stream_config,
-      move |data: &[f32], _: &_| CpalInStream::read_from_stream(data, &mut bf),
+      move |data: &[f32], _: &_| CpalInStream::read_from_stream(data, &mut cast_buf, &mut bf),
       |err| eprintln!("An error occured at cpal stream {}", err),
     )?;
     Ok(CpalInStream { stream, buffer })
@@ -47,8 +50,13 @@ impl CpalInStream {
   }
 
   // the helper function passed to the `stream.build_input_stream`
-  fn read_from_stream(data: &[f32], dest: &mut ConcurrentBuffer<f32>) {
-    dest.write(data).unwrap();
+  fn read_from_stream(data: &[f32], cast_buf: &mut [FP], dest: &mut ConcurrentBuffer<FP>) {
+    let cast_buf = &mut cast_buf[..data.len()];
+    cast_buf
+      .iter_mut()
+      .zip(data.iter())
+      .for_each(|(x, y)| *x = FP::from_f32(*y));
+    dest.write(cast_buf).unwrap();
   }
 }
 
@@ -58,12 +66,13 @@ impl CpalOutStream {
   pub fn new(output_device: Device, stream_config: StreamConfig) -> Result<Self, BuildStreamError> {
     // the callback function should periodically fetch samples
     // from the buffer and write them into the stream
-    let buffer: ConcurrentBuffer<f32> = Default::default();
+    let buffer: ConcurrentBuffer<FP> = Default::default();
     let mut bf = buffer.clone();
+    let mut cast_buf = vec![FP::ZERO; DefaultConfig::BUFFER_SIZE];
 
     let stream = output_device.build_output_stream(
       &stream_config,
-      move |data: &mut [f32], _| CpalOutStream::write_to_stream(data, &mut bf),
+      move |data: &mut [f32], _| CpalOutStream::write_to_stream(data, &mut cast_buf, &mut bf),
       |e| eprintln!("An error occured at cpal out stream {}", e),
     )?;
     Ok(CpalOutStream { stream, buffer })
@@ -83,8 +92,13 @@ impl CpalOutStream {
   }
 
   // helper function passed to the `stream.build_output_stream`
-  fn write_to_stream(data: &mut [f32], src: &mut ConcurrentBuffer<f32>) {
-    let read_size = src.read(data).unwrap();
+  fn write_to_stream(data: &mut [f32], cast_buf: &mut [FP], src: &mut ConcurrentBuffer<FP>) {
+    let cast_buf = &mut cast_buf[0..data.len()];
+    let read_size = src.read(cast_buf).unwrap();
+    data[..read_size]
+      .iter_mut()
+      .zip(cast_buf.iter())
+      .for_each(|(x, y)| *x = FP::into_f32(*y));
     data[read_size..].iter_mut().for_each(|x| *x = 0.0);
   }
 }
@@ -102,15 +116,15 @@ impl Default for CpalInStream {
   }
 }
 
-impl InStream<f32, ()> for CpalInStream {
+impl InStream<FP, ()> for CpalInStream {
   /// Read as many as possible data from the stream and return immediatley with the number of samples read.
-  fn read(&mut self, buf: &mut [f32]) -> Result<usize, ()> {
+  fn read(&mut self, buf: &mut [FP]) -> Result<usize, ()> {
     self.buffer.read(buf)
   }
 
   /// Read exactly `buf.len()` samples from the stream.
   /// This function will not return untill all the samples have been read.
-  fn read_exact(&mut self, buf: &mut [f32]) -> Result<(), ()> {
+  fn read_exact(&mut self, buf: &mut [FP]) -> Result<(), ()> {
     self.buffer.read_exact(buf)
   }
 }
@@ -130,14 +144,14 @@ impl Default for CpalOutStream {
   }
 }
 
-impl OutStream<f32, ()> for CpalOutStream {
+impl OutStream<FP, ()> for CpalOutStream {
   /// Write as many as possible data to the stream, and return with the number of samples written immediately.
-  fn write(&mut self, buf: &[f32]) -> Result<usize, ()> {
+  fn write(&mut self, buf: &[FP]) -> Result<usize, ()> {
     self.buffer.write(buf)
   }
 
   /// Write exactly `buf.len()` samples to the stream. This function will not return until all the samples are written.
-  fn write_exact(&mut self, buf: &[f32]) -> Result<(), ()> {
+  fn write_exact(&mut self, buf: &[FP]) -> Result<(), ()> {
     self.buffer.write_exact(buf)
   }
 }
