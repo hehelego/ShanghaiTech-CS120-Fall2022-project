@@ -3,8 +3,8 @@ use rand::{
   Rng,
 };
 
-use super::{OFDM, PSK};
 use crate::phy_packet::Codec;
+use crate::traits::{Sample, FP};
 
 const CODEC_TESTS: usize = 1000;
 
@@ -29,7 +29,7 @@ fn test_noisy<T: Codec, D: Distribution<f32>>(mut codec: T, noise_dist: D) {
   let encoded = codec.encode(&bytes);
   let received: Vec<_> = encoded
     .into_iter()
-    .zip(rand::thread_rng().sample_iter(noise_dist))
+    .zip(rand::thread_rng().sample_iter(noise_dist).map(FP::from_f32))
     .map(|(x, y)| x + y)
     .collect();
   let decoded = codec.decode(&received);
@@ -40,35 +40,39 @@ fn test_noisy<T: Codec, D: Distribution<f32>>(mut codec: T, noise_dist: D) {
 #[test]
 fn psk_ideal() {
   for _ in 0..CODEC_TESTS {
-    test_ideal(PSK::new());
+    test_ideal(super::PSK::new());
   }
 }
 /// PSK decode in noisy channel, where the noise is distributed as Uniform(-1,+1).
 #[test]
 fn psk_noise() {
   for _ in 0..CODEC_TESTS {
-    test_noisy(PSK::new(), Standard);
+    test_noisy(super::PSK::new(), Standard);
   }
 }
 
 /// OFDM decode in an ideal channel
 #[test]
+#[cfg(not(feature = "nofloat"))]
 fn ofdm_ideal() {
   for _ in 0..CODEC_TESTS {
-    test_ideal(OFDM::new());
+    test_ideal(super::OFDM::new());
   }
 }
 /// OFDM decode in noisy channel, where the noise is distributed as Uniform(-1,+1).
 #[test]
+#[cfg(not(feature = "nofloat"))]
 fn ofdm_noise() {
   for _ in 0..CODEC_TESTS {
-    test_noisy(OFDM::new(), Standard);
+    test_noisy(super::OFDM::new(), Standard);
   }
 }
 
 /// OFDM encode/decode + ideal transmission through WAV file
 #[test]
+#[cfg(not(feature = "nofloat"))]
 fn ofdm_wav_once() {
+  use super::OFDM;
   use crate::sample_stream::{HoundInStream, HoundOutStream};
   use crate::traits::{InStream, OutStream};
 

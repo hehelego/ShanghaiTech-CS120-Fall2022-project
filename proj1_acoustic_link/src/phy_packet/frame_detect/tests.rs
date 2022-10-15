@@ -2,7 +2,7 @@
 mod wired_tests {
   use crate::phy_packet::{frame_detect::CorrelationFraming, preambles::ChirpUpDown, FrameDetector, PreambleGen};
   use crate::sample_stream::{HoundInStream, HoundOutStream};
-  use crate::traits::{InStream, OutStream};
+  use crate::traits::{InStream, OutStream, Sample, FP};
 
   #[test]
   fn corr_detect() {
@@ -14,13 +14,13 @@ mod wired_tests {
     // preamble sequence
     preamble
       .iter()
-      .map(|x| x * 0.8 + 0.1 * x.sin())
+      .map(|x| x * FP::from_f32(0.8) + FP::from_f32(0.1) * x.sin())
       .for_each(|x| assert_eq!(detector.on_sample(x), None));
 
     // the payload: exactly one frame will be found
     let mut s = 0;
     for i in 0..PL_LEN * 2 {
-      let v = (0.33 * i as f32).sin();
+      let v = FP::from_f32(0.33 * i as f32).sin();
       if detector.on_sample(v).is_some() {
         println!("detected {}/{}", i, PL_LEN);
         s += 1;
@@ -31,7 +31,7 @@ mod wired_tests {
     // trash: no frame will be found
     s = 0;
     for i in 0..PL_LEN * 2 {
-      let v = (0.33 * i as f32).sin();
+      let v = FP::from_f32(0.33 * i as f32).sin();
       if detector.on_sample(v).is_some() {
         println!("detected {}/{}", i, PL_LEN);
         s += 1;
@@ -52,12 +52,12 @@ mod wired_tests {
       // preamble sequence
       preamble
         .iter()
-        .map(|x| x * 0.8 + 0.1 * x.sin())
+        .map(|x| x * FP::from_f32(0.8) + FP::from_f32(0.1) * x.sin())
         .for_each(|x| assert_eq!(detector.on_sample(x), None));
 
       // the payload: exactly one frame will be found
       for i in 0..PL_LEN * 2 {
-        let v = (0.33 * i as f32).sin();
+        let v = FP::from_f32(0.33 * i as f32).sin();
         if detector.on_sample(v).is_some() {
           println!("detected {}/{}", i, PL_LEN);
           s += 1;
@@ -69,7 +69,7 @@ mod wired_tests {
     // trash: no frame will be found
     s = 0;
     for i in 0..PL_LEN * 2 {
-      let v = (0.33 * i as f32).sin();
+      let v = FP::from_f32(0.33 * i as f32).sin();
       if detector.on_sample(v).is_some() {
         println!("detected {}/{}", i, PL_LEN);
         s += 1;
@@ -85,13 +85,13 @@ mod wired_tests {
     let mut detector = CorrelationFraming::new::<PL_LEN>(ChirpUpDown::new());
 
     // trash sequence
-    let recv: Vec<_> = (0..PRE_LEN).map(|x| x as f32).collect();
+    let recv: Vec<_> = (0..PRE_LEN).map(|x| FP::from_f32(x as f32)).collect();
     recv.iter().for_each(|&x| assert_eq!(detector.on_sample(x), None));
 
     // more random stuff
     let mut s = 0;
     for i in 0..PL_LEN * 20 {
-      let v = (0.33 * i as f32).sin();
+      let v = FP::from_f32(0.33 * i as f32).sin();
       if detector.on_sample(v).is_some() {
         println!("detected {}/{}", i, PL_LEN);
         s += 1;
@@ -110,18 +110,22 @@ mod wired_tests {
     hound_out_stream
       .write(ChirpUpDown::generate().samples().as_slice())
       .unwrap();
-    let payload: Vec<f32> = (0..PL_LEN * 2).map(|x| (x as f32 * 0.33).sin()).collect();
+    let payload: Vec<FP> = (0..PL_LEN * 2).map(|x| FP::from_f32(x as f32 * 0.33).sin()).collect();
     hound_out_stream.write(payload.as_slice()).unwrap();
     hound_out_stream.finalize();
     // Read the samples and try to detect samples again.
     let mut hound_in_stream = HoundInStream::open(FILE_NAME);
-    let mut buf = [0.0; ChirpUpDown::N + 2 * PL_LEN];
+    let mut buf = [FP::ZERO; ChirpUpDown::N + 2 * PL_LEN];
     let mut detector = CorrelationFraming::new::<PL_LEN>(ChirpUpDown::new());
     let mut s = 0;
     hound_in_stream.read_exact(&mut buf).unwrap();
     for x in buf.iter() {
       if let Some(payload_recv) = detector.on_sample(*x) {
-        assert_eq!(&payload_recv, &payload[..PL_LEN]);
+        let dist = payload_recv
+          .iter()
+          .zip(payload[..PL_LEN].iter())
+          .fold(0.0, |s, (x, y)| s + FP::into_f32(x - y) * FP::into_f32(x - y));
+        assert!(dist < 1e-8);
         s += 1;
       }
     }
@@ -135,7 +139,7 @@ mod wired_tests {
     const PACKET_NUM: usize = 20;
     // Write samples to the file.
     let mut hound_out_stream = HoundOutStream::create(FILE_NAME);
-    let payload: Vec<f32> = (0..PL_LEN).map(|x| (x as f32 * 0.33).sin()).collect();
+    let payload: Vec<FP> = (0..PL_LEN).map(|x| FP::from_f32(x as f32 * 0.33).sin()).collect();
 
     for _ in 0..PACKET_NUM {
       hound_out_stream
@@ -146,7 +150,7 @@ mod wired_tests {
     hound_out_stream.finalize();
     // Read the samples and try to detect samples again.
     let mut hound_in_stream = HoundInStream::open(FILE_NAME);
-    let mut buf = [0.0; ChirpUpDown::N + PL_LEN];
+    let mut buf = [FP::ZERO; ChirpUpDown::N + PL_LEN];
     let mut detector = CorrelationFraming::new::<PL_LEN>(ChirpUpDown::new());
     let mut s = 0;
     while let Ok(num) = hound_in_stream.read(&mut buf) {
@@ -155,7 +159,11 @@ mod wired_tests {
       }
       for x in buf.iter() {
         if let Some(payload_recv) = detector.on_sample(*x) {
-          assert_eq!(&payload_recv, &payload[..PL_LEN]);
+          let dist = payload_recv
+            .iter()
+            .zip(payload[..PL_LEN].iter())
+            .fold(0.0, |s, (x, y)| s + FP::into_f32(x - y) * FP::into_f32(x - y));
+          assert!(dist < 1e-8);
           s += 1;
         }
       }
@@ -169,11 +177,12 @@ mod wireless_tests {
   use crate::phy_packet::{frame_detect::CorrelationFraming, preambles::ChirpUpDown, FrameDetector};
   use crate::sample_stream::CpalInStream;
   use crate::traits::InStream;
+  use crate::traits::{Sample, FP};
 
   #[test]
   fn corr_detect_air_recv() {
     const PL_LEN: usize = 500;
-    let mut buf = [0.0; ChirpUpDown::N + PL_LEN];
+    let mut buf = [FP::ZERO; ChirpUpDown::N + PL_LEN];
     let mut cpal_in_stream = CpalInStream::default();
     let mut s = 0;
     let mut detector = CorrelationFraming::new::<PL_LEN>(ChirpUpDown::new());
@@ -190,14 +199,13 @@ mod wireless_tests {
     assert_eq!(s, 1);
   }
 
-
   #[test]
   fn corr_detect_air_multi_recv() {
     use std::time::Duration;
 
     const PL_LEN: usize = 2000;
     const PACKET_NUM: usize = 20;
-    let mut buf = [0.0; ChirpUpDown::N + PL_LEN];
+    let mut buf = [FP::ZERO; ChirpUpDown::N + PL_LEN];
     let mut cpal_in_stream = CpalInStream::default();
     let mut s = 0;
     let mut detector = CorrelationFraming::new::<PL_LEN>(ChirpUpDown::new());

@@ -1,6 +1,7 @@
 use crate::{
   helper::{bits_to_bytes, bytes_to_bits, dot_product},
   phy_packet::traits::{Codec, FramePayload, PhyPacket},
+  traits::{Sample, FP},
 };
 
 /// PSK (phase shift keying)  
@@ -8,7 +9,7 @@ use crate::{
 /// - fixed frequency carrier, 0/pi phases
 /// - dot product + integration for demodulation
 pub struct PSK {
-  symbols: [Vec<f32>; 2],
+  symbols: [Vec<FP>; 2],
 }
 impl PSK {
   /// sampling rate of the digital signal
@@ -35,13 +36,13 @@ impl Codec for PSK {
     frame
   }
 
-  fn decode(&mut self, samples: &[f32]) -> PhyPacket {
+  fn decode(&mut self, samples: &[FP]) -> PhyPacket {
     assert_eq!(samples.len(), Self::SAMPLES_PER_PACKET);
 
     let mut bits = Vec::with_capacity(Self::SYMBOLS_PER_PACKET);
     samples.chunks_exact(Self::SAMPLES_PER_SYMBOL).for_each(|symbol| {
       let sum = dot_product(symbol.iter(), self.symbols[0].iter());
-      let bit = if sum < 0.0 { 1 } else { 0 };
+      let bit = if sum < FP::ZERO { 1 } else { 0 };
       bits.push(bit);
     });
     bits_to_bytes(&bits)
@@ -49,12 +50,11 @@ impl Codec for PSK {
 }
 impl PSK {
   pub fn new() -> Self {
-    use std::f32::consts::TAU;
-    let dt = 1.0 / Self::SAMPLE_RATE as f32;
+    let dt = FP::ONE / FP::from_f32(Self::SAMPLE_RATE as f32);
     let zero: Vec<_> = (0..Self::SAMPLES_PER_SYMBOL)
       .map(|i| {
-        let t = dt * i as f32;
-        (TAU * Self::CARRIER_FREQ * t).sin()
+        let t = dt * FP::from_f32(i as f32);
+        (FP::TAU * FP::from_f32(Self::CARRIER_FREQ as f32) * t).sin()
       })
       .collect();
     let one: Vec<_> = zero.iter().map(|x| -x).collect();
@@ -67,4 +67,3 @@ impl Default for PSK {
     Self::new()
   }
 }
-
