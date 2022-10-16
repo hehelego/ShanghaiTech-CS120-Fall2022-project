@@ -5,6 +5,9 @@ pub mod helper;
 /// [`traits::PacketSender`]/[`traits::PacketReceiver`] traits.
 pub mod traits;
 
+/// Provide basic packet oriented data transmission over acoustic link.
+pub mod phy_layer;
+
 /// implementors of [`traits::PacketSender`] and [`traits::PacketReceiver`],
 /// where the packet is a physics layer packet, a fixed size byte slice.
 pub mod phy_packet;
@@ -15,8 +18,6 @@ pub mod sample_stream;
 
 /// blockwise buffer and its thread safe wrapper.
 pub mod block_buffer;
-
-pub mod phy_layer;
 
 // Configurations for the audio stream
 mod default_config;

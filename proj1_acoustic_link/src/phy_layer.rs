@@ -11,8 +11,8 @@ pub use plain::PlainPHY;
 
 /// the atomic physics layer: detect packet lost/corrupt,
 /// no partial failure.
-mod crc_seq;
-pub use crc_seq::{AtomicPHY, PacketError};
+mod atomic;
+pub use atomic::{AtomicPHY, PacketError};
 
 /// PHY layer with OFDM+PSK modulation for higher bit rate
 #[cfg(not(feature = "nofloat"))]
