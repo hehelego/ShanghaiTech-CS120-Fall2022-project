@@ -75,6 +75,46 @@ In this part, we implement
 - PSK modulation: `PSK` is an implementor of `Modem` which supoort `modulate` and `demodulate`.([psk.rs](./proj1_acoustic_link/src/phy_packet/modem/psk.rs))
 - Correlation frame detection: `CorrelationFraming` is an implementor of `FrameDetector` which support `on_sample`.([frame_detect.rs](./proj1_acoustic_link/src/phy_packet/frame_detect.rs))
 - Chirp signal as preamble: `ChirpUpDown` is an implementor of `PreambleGen`, which support `generate`, `len`, `norm` and other helper functions.([preambles.rs](./proj1_acoustic_link/src/phy_packet/preambles.rs))
+- Packet sender and receiver: `PhySender` is an implementor of `PacketSender`, which support `send` function. `PhyReceiver` is an implementor of `PacketReceiver`, which suppor `recv` and `recv_timeout` functions.([txrx.rs](./proj1_acoustic_link/src/phy_packet/txrx.rs)).
+
+#### Tests
+
+**Note:** This test need two nodes to test. This test should be done in a quite room.
+
+On sender node, run
+
+```bash
+cargo test part3_ck1_send --release -- --ignored
+```
+
+Sender will read input from `INPUT.txt`. (Under `./proj1_acoustic_link/INPUT.txt`). This file should contain 10000 numbers either 1 or 0.
+You can generate input by the command
+
+```bash
+cd proj1_acoustic_link
+./input_gen.py <seed> > INPUT.txt
+```
+
+`<seed>` can be an arbitrary number.
+
+---
+
+On the receiver node, run
+
+```bash
+cargo test part3_ck1_recv --release -- --ignored
+```
+
+Receiver will write the received bits into `OUTPUT.txt`. (Under `./proj1_acoustic_link/OUTPUT.txt`.
+Receiver will timeout after 1s if it didn't get any packets.
+You can use
+
+```bash
+cd proj1_acoustic_link
+./cmp.py | wc -l
+```
+
+to get all the error bits. It should be less than 100.
 
 ### Part 4
 
@@ -96,7 +136,7 @@ Here, we express our sincere gratefulness to the authors of the following librar
   for WAV audio file format encode/decode.
 - [crates.io crc](https://crates.io/crates/crc):
   for various CRC checksum/digest algorithm.
-- [crates.io reed-solomon-erasure](https://crates.io/crates/reed-solomon-erasure): 
+- [crates.io reed-solomon-erasure](https://crates.io/crates/reed-solomon-erasure):
   for high-performance reed solomon erasure code encode/decode.
 - [crates.io rustfft](https://crates.io/crates/rustfft):
   for heavily optimized radix-4 FFT/IFFT.
