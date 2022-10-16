@@ -44,7 +44,7 @@ pub fn part1_ck2() {
   cpal_out_stream.clear();
   cpal_in_stream.pause();
   while cpal_in_stream.read(&mut buf).unwrap() != 0 {
-    cpal_out_stream.write(buf).unwrap();
+    cpal_out_stream.write(&buf).unwrap();
   }
   std::thread::sleep(Duration::from_secs(RECDURATION));
 }
