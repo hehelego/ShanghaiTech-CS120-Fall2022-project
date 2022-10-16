@@ -12,6 +12,7 @@ cpal = {path = "../patched_cpal/"}
 hound = "3.5"
 crc = "3.0"
 reed-solomon-erasure = "6.0"
+rustfft = "6.0"
 az = "1.2.1"
 fixed = "1.19"
 cordic = "0.1.5"
