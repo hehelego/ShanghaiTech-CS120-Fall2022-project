@@ -9,7 +9,7 @@ pub struct PlainPHY {
 
 impl PlainPHY {
   /// number of bytes in one packet
-  pub const PACKET_BYTES: usize = Codec_::BYTES_PER_PACKET;
+  pub const PACKET_BYTES: usize = PSK::BYTES_PER_PACKET;
   /// number of samples in one packet
   pub const PACKET_SAMPLES: usize = Tx::SAMPLES_PER_PACKET;
 
@@ -39,11 +39,11 @@ impl PacketReceiver<PhyPacket, ()> for PlainPHY {
 
 impl Default for PlainPHY {
   fn default() -> Self {
-    let tx = Tx::new(OutStream::default(), Codec_::default());
+    let tx = Tx::new(OutStream::default(), PSK::default());
     let rx = Rx::new(
       InStream::default(),
-      Codec_::default(),
-      FrameDetector::new::<{ Codec_::SAMPLES_PER_PACKET }>(Preamble::new()),
+      PSK::default(),
+      FrameDetector::new::<{ PSK::SAMPLES_PER_PACKET }>(Preamble::new()),
     );
     Self::new(tx, rx)
   }

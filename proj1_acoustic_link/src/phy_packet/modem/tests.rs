@@ -3,36 +3,36 @@ use rand::{
   Rng,
 };
 
-use crate::phy_packet::Codec;
+use crate::phy_packet::Modem;
 use crate::traits::{Sample, FP};
 
 const CODEC_TESTS: usize = 1000;
 
 /// encode/decode identity in ideal transmission channel
-fn test_ideal<T: Codec>(mut codec: T) {
+fn test_ideal<T: Modem>(mut codec: T) {
   let bytes: Vec<u8> = rand::thread_rng()
     .sample_iter(Standard)
     .take(T::BYTES_PER_PACKET)
     .collect();
 
-  let encoded = codec.encode(&bytes);
-  let decoded = codec.decode(&encoded);
+  let encoded = codec.modulate(&bytes);
+  let decoded = codec.demodulate(&encoded);
   assert_eq!(bytes.as_slice(), decoded.as_slice());
 }
 /// encode/decode identity in noisy channel, where the noise is distributed as `noise_dist`.
-fn test_noisy<T: Codec, D: Distribution<f32>>(mut codec: T, noise_dist: D) {
+fn test_noisy<T: Modem, D: Distribution<f32>>(mut codec: T, noise_dist: D) {
   let bytes: Vec<u8> = rand::thread_rng()
     .sample_iter(Standard)
     .take(T::BYTES_PER_PACKET)
     .collect();
 
-  let encoded = codec.encode(&bytes);
+  let encoded = codec.modulate(&bytes);
   let received: Vec<_> = encoded
     .into_iter()
     .zip(rand::thread_rng().sample_iter(noise_dist).map(FP::from_f32))
     .map(|(x, y)| x + y)
     .collect();
-  let decoded = codec.decode(&received);
+  let decoded = codec.demodulate(&received);
   assert_eq!(bytes.as_slice(), decoded.as_slice());
 }
 

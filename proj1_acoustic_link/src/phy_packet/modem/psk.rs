@@ -1,6 +1,6 @@
 use crate::{
   helper::{bits_to_bytes, bytes_to_bits, dot_product},
-  phy_packet::traits::{Codec, FramePayload, PhyPacket},
+  phy_packet::traits::{FramePayload, Modem, PhyPacket},
   traits::{Sample, FP},
 };
 
@@ -21,12 +21,12 @@ impl PSK {
   /// number of bits in one packet
   pub const SYMBOLS_PER_PACKET: usize = 80;
 }
-impl Codec for PSK {
+impl Modem for PSK {
   const BYTES_PER_PACKET: usize = PSK::SYMBOLS_PER_PACKET / 8;
 
   const SAMPLES_PER_PACKET: usize = PSK::SAMPLES_PER_SYMBOL * PSK::SYMBOLS_PER_PACKET;
 
-  fn encode(&mut self, bytes: &[u8]) -> FramePayload {
+  fn modulate(&mut self, bytes: &[u8]) -> FramePayload {
     assert_eq!(bytes.len(), Self::BYTES_PER_PACKET);
 
     let mut frame = FramePayload::with_capacity(Self::SAMPLES_PER_PACKET);
@@ -36,7 +36,7 @@ impl Codec for PSK {
     frame
   }
 
-  fn decode(&mut self, samples: &[FP]) -> PhyPacket {
+  fn demodulate(&mut self, samples: &[FP]) -> PhyPacket {
     assert_eq!(samples.len(), Self::SAMPLES_PER_PACKET);
 
     let mut bits = Vec::with_capacity(Self::SYMBOLS_PER_PACKET);
