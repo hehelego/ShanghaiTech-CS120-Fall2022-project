@@ -82,7 +82,40 @@ In this part, we implement
 
 ### Part 6
 
-### Tests
+In this part,
+we use fixed-point numbers instead of floating point nubers
+in preamble generation/detection and modulation/demodulation.
+
+Thanks to the trait oriented feature provided by rust programming language,
+we are able to complete this part by only adding a few lines of code.
+
+- In `traits/sample.rs`, the `trait Sample` is an abstraction of the common operations
+  required to support acoustic link on floating point numbers and fixed point number.
+- Fixed point number special function evaluation are done by CORDIC algorithm, which involves only integer arithmetics.
+- For `modem`, `preamble` and `frame_detect` module,
+  we can use either `fp32` or `fixed::types::I32F32`, which is controlled by the compilation flag `nofloat`.
+- **NOTE** our OFDM modem currently only works with floating point numbers, so it is excluded when the flag `nofloat` is presented.
+
+#### Tests
+
+You can test part6 by the following POSIX shell command,
+where `$seed` is an integer used as pseudo-random number generator seed.
+
+```bash
+# on sender device
+./input_gen.py $seed > INPUT.txt
+cargo test part3_ck1_send --release --features nofloat -- --ignored
+
+# on receiver device
+cargo test part3_ck1_recv --release --features nofloat -- --ignored
+./input_gen.py $seed > INPUT.txt
+./cmp.py
+```
+
+The sender should finish transmission within 15 seconds.  
+The receiver should receive and write the file `OUTPUT.txt` without error.  
+Less than 100 bit flips is expected in the result of comparison.
+
 
 ### Acknowledgement
 
