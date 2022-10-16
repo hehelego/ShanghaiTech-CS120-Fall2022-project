@@ -6,12 +6,12 @@
 
 /// define the types and traits related to physisc layer packet
 pub mod traits;
-pub use traits::{Codec, FrameDetector, FramePayload, PhyPacket, PreambleGen};
+pub use traits::{FrameDetector, FramePayload, Modem, PhyPacket, PreambleGen};
 
 /// implementors of [`FrameDetector`]: audio stream framing algorithms.
 pub mod frame_detect;
 /// implementors of [`Codec`]: modulation methods.
-pub mod modulation;
+pub mod modem;
 /// implementors of [`PreambleGen`]: preamble sequences.
 pub mod preambles;
 

@@ -1,6 +1,7 @@
-use super::common::*;
 use super::PlainPHY;
 use crate::helper::{CrcSeq, SEQ_MOD};
+pub use crate::phy_packet::{Modem, PhyPacket, PreambleGen};
+pub use crate::traits::{PacketReceiver, PacketSender};
 
 #[derive(Debug)]
 /// packet receive error
@@ -26,8 +27,6 @@ type CS = CrcSeq<{ PlainPHY::PACKET_BYTES }>;
 impl AtomicPHY {
   /// number of data bytes in one packet
   pub const PACKET_BYTES: usize = CS::DATA_SIZE;
-  /// number of samples in one packet
-  pub const PACKET_SAMPLES: usize = Tx::SAMPLES_PER_PACKET;
 
   /// combine a sender and a receiver to get a physics layer object
   pub fn new(txrx: PlainPHY) -> Self {

@@ -1,16 +1,7 @@
-pub use crate::phy_packet::{
-  frame_detect::CorrelationFraming as FrameDetector, modulation::OFDM as Codec_, preambles::ChirpUpDown as Preamble,
-  txrx::PhyReceiver, txrx::PhySender,
-};
-
-pub use crate::phy_packet::{Codec, PhyPacket, PreambleGen};
-pub use crate::sample_stream::{CpalInStream as InStream, CpalOutStream as OutStream};
+pub use crate::phy_packet::{Modem, PhyPacket, PreambleGen};
 pub use crate::traits::{PacketReceiver, PacketSender};
 
-// physice packet sender type
-pub type Tx = PhySender<Preamble, Codec_, OutStream, ()>;
-// physice packet receiver type
-pub type Rx = PhyReceiver<Preamble, Codec_, FrameDetector<Preamble>, InStream, ()>;
+use config::*;
 
 /// a physics layer peer object.
 /// use OFDM+BPSK for modulation.
@@ -22,7 +13,7 @@ pub struct HighBpsPHY {
 
 impl HighBpsPHY {
   /// number of bytes in one packet
-  pub const PACKET_BYTES: usize = Codec_::BYTES_PER_PACKET;
+  pub const PACKET_BYTES: usize = ModemMethod::BYTES_PER_PACKET;
   /// number of samples in one packet
   pub const PACKET_SAMPLES: usize = Tx::SAMPLES_PER_PACKET;
 
@@ -52,12 +43,14 @@ impl PacketReceiver<PhyPacket, ()> for HighBpsPHY {
 
 impl Default for HighBpsPHY {
   fn default() -> Self {
-    let tx = Tx::new(OutStream::default(), Codec_::default());
+    let tx = Tx::new(OutStream::default(), ModemMethod::default());
     let rx = Rx::new(
       InStream::default(),
-      Codec_::default(),
-      FrameDetector::new::<{ Codec_::SAMPLES_PER_PACKET }>(Preamble::new()),
+      ModemMethod::default(),
+      FrameDetector::new::<{ ModemMethod::SAMPLES_PER_PACKET }>(Preamble::new()),
     );
     Self::new(tx, rx)
   }
 }
+
+mod config;

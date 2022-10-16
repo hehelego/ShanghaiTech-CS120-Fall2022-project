@@ -21,7 +21,7 @@ pub trait PreambleGen {
 }
 
 /// type traits for encoding/decoding [`PhyPacket`]
-pub trait Codec: Default {
+pub trait Modem: Default {
   /// number of bytes in one packet
   const BYTES_PER_PACKET: usize;
   /// number of samples in one packet
@@ -30,11 +30,11 @@ pub trait Codec: Default {
   /// Encode a chunk of bytes into a sequence of PCM samples.  
   /// The given data should have exactly [`Self::BYTES_PER_PACKET`] bytes.
   /// The returned sequence should have exactly [`Self::SAMPLES_PER_PACKET`] samples.
-  fn encode(&mut self, bytes: &[u8]) -> FramePayload;
+  fn modulate(&mut self, bytes: &[u8]) -> FramePayload;
   /// Decode a chunk of bytes from a sequence of PCM samples.  
   /// The given sequence should have exactly [`Self::SAMPLES_PER_PACKET`] samples.
   /// The return data should have exactly [`Self::BYTES_PER_PACKET`] bytes.
-  fn decode(&mut self, samples: &[FP]) -> PhyPacket;
+  fn demodulate(&mut self, samples: &[FP]) -> PhyPacket;
 }
 
 /// type traits for frame detector strategy
