@@ -149,13 +149,14 @@ where `$seed` is a integer for pseudo-random generator seed.
 ```bash
 # on sender device
 ./input_gen.py $seed > INPUT.txt
-cargo test part3_send --release --features nofloat -- --ignored
+cargo test part5_send --release --features nofloat -- --ignored
 
 # on receiver device
-cargo test part3_recv --release --features nofloat -- --ignored
+cargo test part5_recv --release --features nofloat -- --ignored
 ./input_gen.py $seed > INPUT.txt
 ./cmp.py
 ```
+
 Less than 9 seconds transmission time is expected.  
 We should see less than 100 bit flips in the comparison result.
 
