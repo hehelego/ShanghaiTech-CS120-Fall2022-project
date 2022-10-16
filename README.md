@@ -50,3 +50,29 @@ In this part, we implement
 ### Tests
 
 ### Acknowledgement
+
+We didn't build everything from ground up, instead, we leverage the existing vast rust eco-system.  
+As designing and analysing the whole system is quite beyond our capability, we referred to some journal papers, academic reports and blog posts.  
+Here, we express our sincere gratefulness to the authors of the following libraries/papers
+
+- [crates.io cpal](https://crates.io/crates/cpal):
+  for audio input/output.
+- [crates.io hound](https://crates.io/crates/hound):
+  for WAV audio file format encode/decode.
+- [crates.io crc](https://crates.io/crates/crc):
+  for various CRC checksum/digest algorithm.
+- [crates.io reed-solomon-erasure](https://crates.io/crates/reed-solomon-erasure): 
+  for high-performance reed solomon erasure code encode/decode.
+- [crates.io rustfft](https://crates.io/crates/rustfft):
+  for heavily optimized radix-4 FFT/IFFT.
+- [crates.io fixed](https://crates.io/crates/fixed),
+  [crates.io cordic](https://crates.io/crates/cordic),
+  [crates.io az](https://crates.io/crates/az):
+  for fixed point number arithmetic operation and elementary function evaluation using only integer arithmetic.
+- [IEEE SIGCOMM 2013. Dhwani: secure peer-to-peer acoustic NFC](https://doi.org/10.1145/2534169.2486037):
+  The paper gives a brief analysis of the transmission media (the air, within 0.5 meter).
+  They also measures the basic property of the commodity audio I/O devices (the microphone and the speaker on middle-end laptop/cellphone).
+  We have borrowed the frame preamble from Dhwani, which is a linear up-down chirp signal. It shows great synchronization accuracy and anti-noise ability.
+- [openofdm: an hardware implementation of 802.11 OFDM decoder](https://github.com/jhshi/openofdm):
+  We have implemented a phase shifting correction similar to the one in OpenOFDM.
+  Our preamble detection algorithm is also inspired by OpenOFDM.
