@@ -57,7 +57,7 @@ impl PSK {
         (FP::TAU * FP::from_f32(Self::CARRIER_FREQ as f32) * t).sin()
       })
       .collect();
-    let one: Vec<_> = zero.iter().map(|x| -x).collect();
+    let one: Vec<_> = zero.iter().map(|&x| -x).collect();
     Self { symbols: [zero, one] }
   }
 }

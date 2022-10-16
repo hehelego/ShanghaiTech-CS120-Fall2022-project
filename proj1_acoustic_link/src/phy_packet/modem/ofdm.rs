@@ -1,6 +1,7 @@
 use crate::{
   helper::{bits_to_bytes, bytes_to_bits, copy},
   phy_packet::traits::{FramePayload, Modem, PhyPacket},
+  traits::{Sample, FP},
 };
 use rustfft::{algorithm::Radix4, Fft, FftDirection};
 type Complex = rustfft::num_complex::Complex32;
@@ -24,7 +25,10 @@ impl OFDM {
   pub const SAMPLES_PER_SYMBOL: usize = Self::N + Self::M;
   /// number of bits in one packet
   pub const ENCODE_SYMBOLS: usize = 24;
-  pub const SYMBOLS_PER_PACKET: usize = Self::ENCODE_SYMBOLS + 1;
+  /// total number of symbols in one packet, extra one symbol for training
+  pub const SYMBOLS: usize = Self::ENCODE_SYMBOLS + 1;
+  /// total number of samples for one packet
+  pub const PACKET_SAMPLES: usize = Self::SYMBOLS * Self::SAMPLES_PER_SYMBOL;
 
   /// size of FFT/IFFT
   pub const N: usize = 64;
@@ -88,19 +92,8 @@ impl OFDM {
     }
     train_arg
   }
-}
 
-impl Default for OFDM {
-  fn default() -> Self {
-    Self::new()
-  }
-}
-
-impl Modem for OFDM {
-  const BYTES_PER_PACKET: usize = OFDM::ENCODE_SYMBOLS * OFDM::BITS_PER_SYMBOL / 8;
-  const SAMPLES_PER_PACKET: usize = OFDM::SYMBOLS_PER_PACKET * OFDM::SAMPLES_PER_SYMBOL;
-
-  fn modulate(&mut self, bytes: &[u8]) -> FramePayload {
+  fn encode(&mut self, bytes: &[u8]) -> Vec<f32> {
     assert_eq!(bytes.len(), Self::BYTES_PER_PACKET);
 
     let mut frame = vec![0.0; Self::SAMPLES_PER_PACKET];
@@ -114,19 +107,39 @@ impl Modem for OFDM {
     frame
   }
 
-  fn demodulate(&mut self, samples: &[f32]) -> PhyPacket {
+  fn decode(&mut self, samples: &[f32]) -> Vec<u8> {
     assert_eq!(samples.len(), Self::SAMPLES_PER_PACKET);
 
     let mut buf = [Complex::default(); Self::N];
 
     let (train_samples, samples) = samples.split_at(Self::SAMPLES_PER_SYMBOL);
-    let train_arg = self.train(&mut buf, &train_samples);
+    let train_arg = self.train(&mut buf, train_samples);
 
-    let mut bits = [0; OFDM::ENCODE_SYMBOLS * OFDM::BITS_PER_SYMBOL];
+    let mut bits = [0; Self::ENCODE_SYMBOLS * Self::BITS_PER_SYMBOL];
     samples
       .chunks_exact(Self::SAMPLES_PER_SYMBOL)
       .zip(bits.chunks_exact_mut(Self::BITS_PER_SYMBOL))
       .for_each(|(symbol, bits)| self.decode_symbol(&mut buf, symbol, bits, &train_arg));
     bits_to_bytes(&bits)
+  }
+}
+
+impl Default for OFDM {
+  fn default() -> Self {
+    Self::new()
+  }
+}
+
+impl Modem for OFDM {
+  const BYTES_PER_PACKET: usize = OFDM::BITS_PER_SYMBOL * OFDM::ENCODE_SYMBOLS / 8;
+  const SAMPLES_PER_PACKET: usize = OFDM::PACKET_SAMPLES;
+
+  fn modulate(&mut self, bytes: &[u8]) -> FramePayload {
+    OFDM::encode(self, bytes).into_iter().map(FP::from_f32).collect()
+  }
+
+  fn demodulate(&mut self, samples: &[FP]) -> PhyPacket {
+    let samples: Vec<_> = samples.iter().cloned().map(FP::into_f32).collect();
+    OFDM::decode(self, &samples)
   }
 }

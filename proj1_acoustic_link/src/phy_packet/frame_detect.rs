@@ -153,7 +153,7 @@ where
     }
     // To check if is the beginning of the preamble
     let (corr2pwr, cosine_sim) = self.calculate_relations();
-    if corr2pwr >= Self::CORR_TO_PWR_MIN && cosine_sim >= Self::COSINE_MIN {
+    if corr2pwr >= FP::from_f32(Self::CORR_TO_PWR_MIN) && cosine_sim >= FP::from_f32(Self::COSINE_MIN) {
       self.corr_peak_value = corr2pwr;
       self.corr_peak_index = self.detect_window.tail_index;
       println!("Log: Detect Rising Edge");
@@ -169,7 +169,7 @@ where
     self.detect_window.update(sample);
     // Get the data.
     let (corr2pwr, cosine_sim) = self.calculate_relations();
-    if corr2pwr < self.corr_peak_value || cosine_sim < Self::COSINE_MIN {
+    if corr2pwr < self.corr_peak_value || cosine_sim < FP::from_f32(Self::COSINE_MIN) {
       println!("Log: Detect Falling Edge");
       return FramingState::DetectFallingEdge;
     }

@@ -1,14 +1,6 @@
 use std::cmp::{PartialEq, PartialOrd};
 use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 
-// pub type FixedPoint = fixed::types::I20F12;
-pub type FixedPoint = fixed::types::I32F32;
-
-#[cfg(feature = "nofloat")]
-pub type FP = FixedPoint;
-#[cfg(not(feature = "nofloat"))]
-pub type FP = f32;
-
 pub trait Sample:
   'static
   + Copy
@@ -45,44 +37,117 @@ pub trait Sample:
   fn sin(self) -> Self;
 }
 
-impl Sample for f32 {
-  fn from_f32(x: f32) -> Self {
-    x
-  }
-  fn into_f32(self) -> f32 {
-    self
-  }
-
-  const PI: Self = std::f32::consts::PI;
-  const TAU: Self = std::f32::consts::TAU;
-  const ONE: Self = 1.0;
-  const ZERO: Self = 0.0;
-
-  fn sqrt(self) -> Self {
-    f32::sqrt(self)
-  }
-  fn sin(self) -> Self {
-    f32::sin(self)
-  }
+/// create a number type wrapper,
+/// implement arithmetic operator traits for it.
+macro_rules! num_type {
+  ($name:ident,$inner:ty) => {
+    use std::ops::{Add, AddAssign, Div, DivAssign, Mul, MulAssign, Neg, Sub, SubAssign};
+    #[derive(Clone, Copy, PartialEq, PartialOrd, Debug)]
+    pub struct $name($inner);
+    impl Neg for $name {
+      type Output = $name;
+      fn neg(self) -> $name {
+        $name(-self.0)
+      }
+    }
+    impl Add for $name {
+      type Output = $name;
+      fn add(self, rhs: $name) -> $name {
+        $name(self.0 + rhs.0)
+      }
+    }
+    impl Sub for $name {
+      type Output = $name;
+      fn sub(self, rhs: $name) -> $name {
+        $name(self.0 - rhs.0)
+      }
+    }
+    impl Mul for $name {
+      type Output = $name;
+      fn mul(self, rhs: $name) -> $name {
+        $name(self.0 * rhs.0)
+      }
+    }
+    impl Div for $name {
+      type Output = $name;
+      fn div(self, rhs: $name) -> $name {
+        $name(self.0 / rhs.0)
+      }
+    }
+    impl AddAssign for $name {
+      fn add_assign(&mut self, rhs: $name) {
+        self.0 += rhs.0;
+      }
+    }
+    impl SubAssign for $name {
+      fn sub_assign(&mut self, rhs: $name) {
+        self.0 -= rhs.0;
+      }
+    }
+    impl MulAssign for $name {
+      fn mul_assign(&mut self, rhs: $name) {
+        self.0 *= rhs.0;
+      }
+    }
+    impl DivAssign for $name {
+      fn div_assign(&mut self, rhs: $name) {
+        self.0 /= rhs.0;
+      }
+    }
+  };
 }
 
-impl Sample for FixedPoint {
-  fn from_f32(x: f32) -> Self {
-    az::CastFrom::cast_from(x)
-  }
-  fn into_f32(self) -> f32 {
-    az::Cast::cast(self)
-  }
+#[cfg(feature = "nofloat")]
+pub use fixed_point_sample::FP;
+#[cfg(not(feature = "nofloat"))]
+pub use float_point_sample::FP;
 
-  const PI: Self = Self::PI;
-  const TAU: Self = Self::TAU;
-  const ONE: Self = Self::ONE;
-  const ZERO: Self = Self::ZERO;
+#[cfg(feature = "nofloat")]
+mod fixed_point_sample {
+  type FixedPoint = fixed::types::I32F32;
+  num_type! {FP, FixedPoint}
+  impl super::Sample for FP {
+    fn from_f32(x: f32) -> Self {
+      Self(az::CastFrom::cast_from(x))
+    }
+    fn into_f32(self) -> f32 {
+      az::Cast::cast(self.0)
+    }
 
-  fn sqrt(self) -> Self {
-    cordic::sqrt(self)
+    const PI: Self = Self(FixedPoint::PI);
+    const TAU: Self = Self(FixedPoint::TAU);
+    const ONE: Self = Self(FixedPoint::ONE);
+    const ZERO: Self = Self(FixedPoint::ZERO);
+
+    fn sqrt(self) -> Self {
+      Self(cordic::sqrt(self.0))
+    }
+    fn sin(self) -> Self {
+      Self(cordic::sin(self.0))
+    }
   }
-  fn sin(self) -> Self {
-    cordic::sin(self)
+}
+#[cfg(not(feature = "nofloat"))]
+mod float_point_sample {
+  num_type! {FP, f32}
+  impl super::Sample for FP {
+    fn from_f32(x: f32) -> Self {
+      Self(x)
+    }
+    fn into_f32(self) -> f32 {
+      self.0
+    }
+
+    const PI: Self = Self(std::f32::consts::PI);
+    const TAU: Self = Self(std::f32::consts::TAU);
+    const ONE: Self = Self(1.0);
+    const ZERO: Self = Self(0.0);
+
+    fn sqrt(self) -> Self {
+      Self(self.0.sqrt())
+    }
+    fn sin(self) -> Self {
+      Self(self.0.sin())
+    }
   }
 }

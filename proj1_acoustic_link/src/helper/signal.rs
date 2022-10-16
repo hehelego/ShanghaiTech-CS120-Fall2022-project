@@ -25,7 +25,7 @@ where
   Ib: ExactSizeIterator<Item = &'a FP>,
 {
   assert_eq!(seq_a.len(), seq_b.len());
-  seq_a.zip(seq_b).fold(FP::ZERO, |sum, (x, y)| sum + x * y)
+  seq_a.zip(seq_b).fold(FP::ZERO, |sum, (&x, &y)| sum + x * y)
 }
 
 /// Copy samples from `src` to fill `dest`.  
