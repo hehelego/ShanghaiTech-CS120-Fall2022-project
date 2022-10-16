@@ -12,41 +12,41 @@ use std::{
 
 /// A send only PHY layer object.  
 /// - PG: preamble generator
-/// - CC: modulation encoder/decoder
+/// - MM: modulator/demodulator
 /// - SS: sample input stream
 /// - E: sample input stream error type
-pub struct PhySender<PG, CC, SS, E> {
+pub struct PhySender<PG, MM, SS, E> {
   _pg: PhantomData<PG>,
   _err: PhantomData<E>,
   preamble_samples: Vec<FP>,
-  codec: CC,
+  modem: MM,
   stream_out: SS,
 }
 
-impl<PG, CC, SS, E> PhySender<PG, CC, SS, E>
+impl<PG, MM, SS, E> PhySender<PG, MM, SS, E>
 where
   PG: PreambleGen,
-  CC: Modem,
+  MM: Modem,
   SS: OutStream<FP, E>,
 {
-  pub fn new(stream_out: SS, codec: CC) -> Self {
+  pub fn new(stream_out: SS, modem: MM) -> Self {
     let preamble_samples = PG::generate().samples();
 
     Self {
       _pg: PhantomData::default(),
       _err: PhantomData::default(),
       preamble_samples,
-      codec,
+      modem,
       stream_out,
     }
   }
 
-  pub const SAMPLES_PER_PACKET: usize = PG::PREAMBLE_LEN + CC::SAMPLES_PER_PACKET;
+  pub const SAMPLES_PER_PACKET: usize = PG::PREAMBLE_LEN + MM::SAMPLES_PER_PACKET;
 }
-impl<PG, CC, SS, E> PacketSender<PhyPacket, E> for PhySender<PG, CC, SS, E>
+impl<PG, MM, SS, E> PacketSender<PhyPacket, E> for PhySender<PG, MM, SS, E>
 where
   PG: PreambleGen,
-  CC: Modem,
+  MM: Modem,
   SS: OutStream<FP, E>,
 {
   /// frame = warm up + preamble + payload  
@@ -55,35 +55,35 @@ where
   /// - payload: output of modulation on packet bytes
   /// NOTE: write them to the underlying stream together with `write_once`
   fn send(&mut self, packet: PhyPacket) -> Result<(), E> {
-    assert_eq!(packet.len(), CC::BYTES_PER_PACKET);
-    let mut buf = Vec::with_capacity(PG::PREAMBLE_LEN + CC::SAMPLES_PER_PACKET);
+    assert_eq!(packet.len(), MM::BYTES_PER_PACKET);
+    let mut buf = Vec::with_capacity(PG::PREAMBLE_LEN + MM::SAMPLES_PER_PACKET);
     buf.extend(&self.preamble_samples);
-    buf.extend(self.codec.modulate(&packet));
+    buf.extend(self.modem.modulate(&packet));
     self.stream_out.write_exact(&buf)
   }
 }
 
 /// A receive only PHY layer object.  
 /// - PG: preamble generator
-/// - CC: modulation encoder/decoder
+/// - MM: modulation encoder/decoder
 /// - FD: frame detector
 /// - SS: sample output stream
 /// - E: sample output stream error type
-pub struct PhyReceiver<PG, CC, FD, SS, E> {
+pub struct PhyReceiver<PG, MM, FD, SS, E> {
   _pg: PhantomData<PG>,
   _fd: PhantomData<FD>,
   _ss: PhantomData<SS>,
   _err: PhantomData<E>,
-  codec: CC,
+  modem: MM,
   frame_payload_rx: Receiver<FramePayload>,
   exit_tx: Sender<()>,
   handler: Option<JoinHandle<()>>,
 }
 
-impl<PG, CC, FD, SS, E> PhyReceiver<PG, CC, FD, SS, E>
+impl<PG, MM, FD, SS, E> PhyReceiver<PG, MM, FD, SS, E>
 where
   PG: PreambleGen,
-  CC: Modem,
+  MM: Modem,
   FD: FrameDetector + Send + 'static,
   SS: InStream<FP, E> + Send + 'static,
   E: std::fmt::Debug,
@@ -113,7 +113,7 @@ where
     }
   }
 
-  pub fn new(stream_in: SS, codec: CC, frame_detector: FD) -> Self {
+  pub fn new(stream_in: SS, modem: MM, frame_detector: FD) -> Self {
     let (exit_tx, exit_rx) = channel();
     let (frame_playload_tx, frame_payload_rx) = channel();
     let handler = thread::spawn(move || Self::worker(stream_in, frame_detector, frame_playload_tx, exit_rx));
@@ -122,7 +122,7 @@ where
       _fd: PhantomData::default(),
       _ss: PhantomData::default(),
       _err: PhantomData::default(),
-      codec,
+      modem,
       frame_payload_rx,
       exit_tx,
       handler: Some(handler),
@@ -130,30 +130,30 @@ where
   }
 }
 
-impl<PG, CC, FD, SS, E> PacketReceiver<PhyPacket, ()> for PhyReceiver<PG, CC, FD, SS, E>
+impl<PG, MM, FD, SS, E> PacketReceiver<PhyPacket, ()> for PhyReceiver<PG, MM, FD, SS, E>
 where
   PG: PreambleGen,
-  CC: Modem,
+  MM: Modem,
   FD: FrameDetector,
   SS: InStream<FP, E>,
 {
   // receive frame from the channel and then demodulate the signal
   fn recv(&mut self) -> Result<PhyPacket, ()> {
     match self.frame_payload_rx.try_recv() {
-      Ok(payload) => Ok(self.codec.demodulate(&payload)),
+      Ok(payload) => Ok(self.modem.demodulate(&payload)),
       Err(_) => Err(()),
     }
   }
 
   fn recv_timeout(&mut self, timeout: Duration) -> Result<PhyPacket, ()> {
     match self.frame_payload_rx.recv_timeout(timeout) {
-      Ok(payload) => Ok(self.codec.demodulate(&payload)),
+      Ok(payload) => Ok(self.modem.demodulate(&payload)),
       Err(_) => Err(()),
     }
   }
 }
 
-impl<PG, CC, FD, SS, E> Drop for PhyReceiver<PG, CC, FD, SS, E> {
+impl<PG, MM, FD, SS, E> Drop for PhyReceiver<PG, MM, FD, SS, E> {
   // notify the worker thread to exit
   // wait for the worker thread to stop
   fn drop(&mut self) {

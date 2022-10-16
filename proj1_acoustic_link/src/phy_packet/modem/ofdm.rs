@@ -113,7 +113,7 @@ impl OFDM {
     let mut buf = [Complex::default(); Self::N];
 
     let (train_samples, samples) = samples.split_at(Self::SAMPLES_PER_SYMBOL);
-    let train_arg = self.train(&mut buf, &train_samples);
+    let train_arg = self.train(&mut buf, train_samples);
 
     let mut bits = [0; Self::ENCODE_SYMBOLS * Self::BITS_PER_SYMBOL];
     samples
