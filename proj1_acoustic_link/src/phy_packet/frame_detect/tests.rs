@@ -14,7 +14,7 @@ mod wired_tests {
     // preamble sequence
     preamble
       .iter()
-      .map(|x| x * FP::from_f32(0.8) + FP::from_f32(0.1) * x.sin())
+      .map(|&x| x * FP::from_f32(0.8) + FP::from_f32(0.1) * x.sin())
       .for_each(|x| assert_eq!(detector.on_sample(x), None));
 
     // the payload: exactly one frame will be found
@@ -52,7 +52,7 @@ mod wired_tests {
       // preamble sequence
       preamble
         .iter()
-        .map(|x| x * FP::from_f32(0.8) + FP::from_f32(0.1) * x.sin())
+        .map(|&x| x * FP::from_f32(0.8) + FP::from_f32(0.1) * x.sin())
         .for_each(|x| assert_eq!(detector.on_sample(x), None));
 
       // the payload: exactly one frame will be found
@@ -124,7 +124,7 @@ mod wired_tests {
         let dist = payload_recv
           .iter()
           .zip(payload[..PL_LEN].iter())
-          .fold(0.0, |s, (x, y)| s + FP::into_f32(x - y) * FP::into_f32(x - y));
+          .fold(0.0, |s, (&x, &y)| s + FP::into_f32(x - y) * FP::into_f32(x - y));
         assert!(dist < 1e-8);
         s += 1;
       }
@@ -162,7 +162,7 @@ mod wired_tests {
           let dist = payload_recv
             .iter()
             .zip(payload[..PL_LEN].iter())
-            .fold(0.0, |s, (x, y)| s + FP::into_f32(x - y) * FP::into_f32(x - y));
+            .fold(0.0, |s, (&x, &y)| s + FP::into_f32(x - y) * FP::into_f32(x - y));
           assert!(dist < 1e-8);
           s += 1;
         }

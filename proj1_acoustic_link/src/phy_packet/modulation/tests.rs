@@ -89,7 +89,7 @@ fn ofdm_wav_once() {
   out_stream.finalize();
 
   let mut in_stream = HoundInStream::open("ofdm_test.wav");
-  let mut received = vec![0.0; OFDM::SAMPLES_PER_PACKET * CODEC_TESTS];
+  let mut received = vec![FP::ZERO; OFDM::SAMPLES_PER_PACKET * CODEC_TESTS];
   in_stream.read_exact(&mut received).unwrap();
   let decoded: Vec<_> = received
     .chunks_exact(OFDM::SAMPLES_PER_PACKET)
