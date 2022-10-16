@@ -85,7 +85,7 @@ fn ofdm_wav_once() {
   let mut out_stream = HoundOutStream::create("ofdm_test.wav");
   bytes
     .chunks_exact(OFDM::BYTES_PER_PACKET)
-    .for_each(|pack| out_stream.write_exact(&codec.encode(pack)).unwrap());
+    .for_each(|pack| out_stream.write_exact(&codec.modulate(pack)).unwrap());
   out_stream.finalize();
 
   let mut in_stream = HoundInStream::open("ofdm_test.wav");
@@ -93,7 +93,7 @@ fn ofdm_wav_once() {
   in_stream.read_exact(&mut received).unwrap();
   let decoded: Vec<_> = received
     .chunks_exact(OFDM::SAMPLES_PER_PACKET)
-    .flat_map(|pack| codec.decode(pack))
+    .flat_map(|pack| codec.demodulate(pack))
     .collect();
   assert_eq!(bytes.as_slice(), decoded.as_slice());
 }
