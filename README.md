@@ -78,7 +78,38 @@ In this part, we implement
 
 ### Part 4
 
+In this part, we implemented file transmission with error correction.
 
+- In `phy_layer` module, we added `AtomicPHY` which use sequence number and CRC checksum
+  to ensure the data integrity of received data packets
+  and infer the number of lost packets between two successful transmitted packets.
+- In `tests/part4.rs`,
+  - sender:
+  The data file is chunked into fixed size shards
+  and extra 30 chunks are generated with Reed-Solomon encoder.
+  The chunks are then sent via `AtomicPHY`.
+  - receiver:
+  Receiver data shards and error correction chunks via `AtomicPHY`.
+  Erase the lost shards and corrupted shards.
+  Recover the data file with Reed-Solomon decode.
+
+#### Tests
+
+To test part 4, you can run the following POSIX shell command on two devices.
+
+```bash
+# on sender device
+./input_gen.py $seed > INPUT.txt
+cargo test part4_send --release --features nofloat -- --ignored
+
+# on receiver device
+cargo test part4_recv --release --features nofloat -- --ignored
+./input_gen.py $seed > INPUT.txt
+./cmp.py
+```
+
+Less than 20 seconds transmission time is expected.  
+The comparison result should be empty which indicates that the `OUTPUT.txt` is identical to `INPUT.txt`.
 
 ### Part 5
 
@@ -89,7 +120,7 @@ In this part, we implemented OFDM+BPSK modulation which should at least double t
 
 #### Tests
 
-To test part 4, you can run the following POSIX shell command on two devices.
+To test part 5, you can run the following POSIX shell command on two devices.
 
 ```bash
 # on sender device
@@ -122,7 +153,7 @@ we are able to complete this part by only adding a few lines of code.
 
 #### Tests
 
-You can test part6 by the following POSIX shell command,
+You can test part 6 by running the following POSIX shell command,
 where `$seed` is an integer used as pseudo-random number generator seed.
 
 ```bash
