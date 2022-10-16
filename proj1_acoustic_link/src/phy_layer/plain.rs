@@ -1,4 +1,6 @@
-use super::common::*;
+pub use crate::phy_packet::{Modem, PhyPacket, PreambleGen};
+pub use crate::traits::{PacketReceiver, PacketSender};
+use config::*;
 
 /// a physics layer peer object.
 /// send/recv packets with no latency/correctness guarantee.
@@ -9,7 +11,7 @@ pub struct PlainPHY {
 
 impl PlainPHY {
   /// number of bytes in one packet
-  pub const PACKET_BYTES: usize = Codec_::BYTES_PER_PACKET;
+  pub const PACKET_BYTES: usize = ModemMethod::BYTES_PER_PACKET;
   /// number of samples in one packet
   pub const PACKET_SAMPLES: usize = Tx::SAMPLES_PER_PACKET;
 
@@ -39,12 +41,14 @@ impl PacketReceiver<PhyPacket, ()> for PlainPHY {
 
 impl Default for PlainPHY {
   fn default() -> Self {
-    let tx = Tx::new(OutStream::default(), Codec_::default());
+    let tx = Tx::new(OutStream::default(), ModemMethod::default());
     let rx = Rx::new(
       InStream::default(),
-      Codec_::default(),
-      FrameDetector::new::<{ Codec_::SAMPLES_PER_PACKET }>(Preamble::new()),
+      ModemMethod::default(),
+      FrameDetector::new::<{ ModemMethod::SAMPLES_PER_PACKET }>(Preamble::new()),
     );
     Self::new(tx, rx)
   }
 }
+
+mod config;

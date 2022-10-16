@@ -1,6 +1,6 @@
-use super::{traits::PhyPacket, Codec, FrameDetector, FramePayload, PreambleGen};
+use super::{traits::PhyPacket, FrameDetector, FramePayload, Modem, PreambleGen};
 use crate::{
-  traits::{InStream, OutStream, PacketReceiver, PacketSender, FP, Sample},
+  traits::{InStream, OutStream, PacketReceiver, PacketSender, Sample, FP},
   DefaultConfig,
 };
 use std::{
@@ -26,7 +26,7 @@ pub struct PhySender<PG, CC, SS, E> {
 impl<PG, CC, SS, E> PhySender<PG, CC, SS, E>
 where
   PG: PreambleGen,
-  CC: Codec,
+  CC: Modem,
   SS: OutStream<FP, E>,
 {
   pub fn new(stream_out: SS, codec: CC) -> Self {
@@ -46,7 +46,7 @@ where
 impl<PG, CC, SS, E> PacketSender<PhyPacket, E> for PhySender<PG, CC, SS, E>
 where
   PG: PreambleGen,
-  CC: Codec,
+  CC: Modem,
   SS: OutStream<FP, E>,
 {
   /// frame = warm up + preamble + payload  
@@ -58,7 +58,7 @@ where
     assert_eq!(packet.len(), CC::BYTES_PER_PACKET);
     let mut buf = Vec::with_capacity(PG::PREAMBLE_LEN + CC::SAMPLES_PER_PACKET);
     buf.extend(&self.preamble_samples);
-    buf.extend(self.codec.encode(&packet));
+    buf.extend(self.codec.modulate(&packet));
     self.stream_out.write_exact(&buf)
   }
 }
@@ -83,7 +83,7 @@ pub struct PhyReceiver<PG, CC, FD, SS, E> {
 impl<PG, CC, FD, SS, E> PhyReceiver<PG, CC, FD, SS, E>
 where
   PG: PreambleGen,
-  CC: Codec,
+  CC: Modem,
   FD: FrameDetector + Send + 'static,
   SS: InStream<FP, E> + Send + 'static,
   E: std::fmt::Debug,
@@ -133,21 +133,21 @@ where
 impl<PG, CC, FD, SS, E> PacketReceiver<PhyPacket, ()> for PhyReceiver<PG, CC, FD, SS, E>
 where
   PG: PreambleGen,
-  CC: Codec,
+  CC: Modem,
   FD: FrameDetector,
   SS: InStream<FP, E>,
 {
   // receive frame from the channel and then demodulate the signal
   fn recv(&mut self) -> Result<PhyPacket, ()> {
     match self.frame_payload_rx.try_recv() {
-      Ok(payload) => Ok(self.codec.decode(&payload)),
+      Ok(payload) => Ok(self.codec.demodulate(&payload)),
       Err(_) => Err(()),
     }
   }
 
   fn recv_timeout(&mut self, timeout: Duration) -> Result<PhyPacket, ()> {
     match self.frame_payload_rx.recv_timeout(timeout) {
-      Ok(payload) => Ok(self.codec.decode(&payload)),
+      Ok(payload) => Ok(self.codec.demodulate(&payload)),
       Err(_) => Err(()),
     }
   }
