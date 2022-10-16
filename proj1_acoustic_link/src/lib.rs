@@ -19,5 +19,5 @@ pub mod block_buffer;
 pub mod phy_layer;
 
 // Configurations for the audio stream
-mod defaut_config;
-pub use defaut_config::DefaultConfig;
+mod default_config;
+pub use default_config::DefaultConfig;
