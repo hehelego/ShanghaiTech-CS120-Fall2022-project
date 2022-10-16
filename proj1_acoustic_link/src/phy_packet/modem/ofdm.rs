@@ -1,7 +1,7 @@
 use crate::{
   helper::{bits_to_bytes, bytes_to_bits, copy},
-  traits::{Sample, FP},
   phy_packet::traits::{FramePayload, Modem, PhyPacket},
+  traits::{Sample, FP},
 };
 use rustfft::{algorithm::Radix4, Fft, FftDirection};
 type Complex = rustfft::num_complex::Complex32;
@@ -131,7 +131,7 @@ impl Default for OFDM {
 }
 
 impl Modem for OFDM {
-  const BYTES_PER_PACKET: usize = OFDM::ENCODE_SYMBOLS / 8;
+  const BYTES_PER_PACKET: usize = OFDM::BITS_PER_SYMBOL * OFDM::ENCODE_SYMBOLS / 8;
   const SAMPLES_PER_PACKET: usize = OFDM::PACKET_SAMPLES;
 
   fn modulate(&mut self, bytes: &[u8]) -> FramePayload {
