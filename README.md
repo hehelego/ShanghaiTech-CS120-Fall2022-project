@@ -81,42 +81,24 @@ In this part, we implement
 
 **Note:** This test need two nodes to test. This test should be done in a quite room.
 
-On sender node, run
+To test part 3, you can run the following POSIX shell command on two devices,
+where `$seed` is a integer for pseudo-random generator seed.
 
 ```bash
+# on sender device
+./input_gen.py $seed > INPUT.txt
 cargo test part3_ck1_send --release -- --ignored
-```
 
-Sender will read input from `INPUT.txt`. (Under `./proj1_acoustic_link/INPUT.txt`). This file should contain 10000 numbers either 1 or 0.
-You can generate input by the command
-
-```bash
-cd proj1_acoustic_link
-./input_gen.py <seed> > INPUT.txt
-```
-
-`<seed>` can be an arbitrary number.
-
----
-
-On the receiver node, run
-
-```bash
+# on receiver device
 cargo test part3_ck1_recv --release -- --ignored
+./input_gen.py $seed > INPUT.txt
+./cmp.py
 ```
 
-Receiver will write the received bits into `OUTPUT.txt`. (Under `./proj1_acoustic_link/OUTPUT.txt`.
-Receiver will timeout after 1s if it didn't get any packets.
-You can use
+Less than 15 seconds transmission time is expected.  
+Less than 100 bit filps is expected.
 
-```bash
-cd proj1_acoustic_link
-./cmp.py | wc -l
-```
-
-to get all the error bits. It should be less than 100.
-
-### Part 4
+### Part 4 Error Correction
 
 In this part, we implemented file transmission with error correction.
 
@@ -135,7 +117,8 @@ In this part, we implemented file transmission with error correction.
 
 #### Tests
 
-To test part 4, you can run the following POSIX shell command on two devices.
+To test part 4, you can run the following POSIX shell command on two devices,
+where `$seed` is a integer for pseudo-random generator seed.
 
 ```bash
 # on sender device
@@ -151,7 +134,7 @@ cargo test part4_recv --release --features nofloat -- --ignored
 Less than 20 seconds transmission time is expected.  
 The comparison result should be empty which indicates that the `OUTPUT.txt` is identical to `INPUT.txt`.
 
-### Part 5
+### Part 5 Higher Bandwidth
 
 In this part, we implemented OFDM+BPSK modulation which should at least double the bandwidth.
 
@@ -160,7 +143,8 @@ In this part, we implemented OFDM+BPSK modulation which should at least double t
 
 #### Tests
 
-To test part 5, you can run the following POSIX shell command on two devices.
+To test part 5, you can run the following POSIX shell command on two devices,
+where `$seed` is a integer for pseudo-random generator seed.
 
 ```bash
 # on sender device
@@ -175,7 +159,7 @@ cargo test part3_recv --release --features nofloat -- --ignored
 Less than 9 seconds transmission time is expected.  
 We should see less than 100 bit flips in the comparison result.
 
-### Part 6
+### Part 6 Need for Speed, No Floating Points
 
 In this part,
 we use fixed-point numbers instead of floating point nubers
@@ -193,7 +177,7 @@ we are able to complete this part by only adding a few lines of code.
 
 #### Tests
 
-You can test part 6 by running the following POSIX shell command,
+You can test part 6 by running the following POSIX shell command on two devices,
 where `$seed` is an integer used as pseudo-random number generator seed.
 
 ```bash
