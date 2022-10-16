@@ -2,7 +2,7 @@
 
 In each project, we will explain our project part by part. Each part includes a brief explanation and the test method. At the end of each project, we will have an acknowledgement. You can build the code documentation by the following command:
 
-```shell
+```bash
 cargo doc --open
 ```
 
@@ -78,7 +78,31 @@ In this part, we implement
 
 ### Part 4
 
+
+
 ### Part 5
+
+In this part, we implemented OFDM+BPSK modulation which should at least double the bandwidth.
+
+- In `modem` module, we implemented OFDM+BPSK modem in `ofdm` sub-module.
+- In `phy_layer` module, we implemented `HighBpsPHY` which use the OFDM modem to achieve higher bit rate in file transmission task.
+
+#### Tests
+
+To test part 4, you can run the following POSIX shell command on two devices.
+
+```bash
+# on sender device
+./input_gen.py $seed > INPUT.txt
+cargo test part3_send --release --features nofloat -- --ignored
+
+# on receiver device
+cargo test part3_recv --release --features nofloat -- --ignored
+./input_gen.py $seed > INPUT.txt
+./cmp.py
+```
+Less than 9 seconds transmission time is expected.  
+We should see less than 100 bit flips in the comparison result.
 
 ### Part 6
 
