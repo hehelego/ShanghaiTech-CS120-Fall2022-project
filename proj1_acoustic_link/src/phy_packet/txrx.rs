@@ -15,7 +15,7 @@ use std::{
 /// - MM: modulator/demodulator
 /// - SS: sample input stream
 /// - E: sample input stream error type
-pub struct PhySender<PG, MM, SS, E> {
+pub struct PhySender<PG, MM, SS, E, const PAD: usize = { DefaultConfig::SENDER_PADDING }> {
   _pg: PhantomData<PG>,
   _err: PhantomData<E>,
   preamble_samples: Vec<FP>,
@@ -23,7 +23,7 @@ pub struct PhySender<PG, MM, SS, E> {
   stream_out: SS,
 }
 
-impl<PG, MM, SS, E> PhySender<PG, MM, SS, E>
+impl<PG, MM, SS, E, const PAD: usize> PhySender<PG, MM, SS, E, PAD>
 where
   PG: PreambleGen,
   MM: Modem,
@@ -43,7 +43,7 @@ where
 
   pub const SAMPLES_PER_PACKET: usize = PG::PREAMBLE_LEN + MM::SAMPLES_PER_PACKET;
 }
-impl<PG, MM, SS, E> PacketSender<PhyPacket, E> for PhySender<PG, MM, SS, E>
+impl<PG, MM, SS, E, const PAD: usize> PacketSender<PhyPacket, E> for PhySender<PG, MM, SS, E, PAD>
 where
   PG: PreambleGen,
   MM: Modem,
@@ -59,6 +59,7 @@ where
     let mut buf = Vec::with_capacity(PG::PREAMBLE_LEN + MM::SAMPLES_PER_PACKET);
     buf.extend(&self.preamble_samples);
     buf.extend(self.modem.modulate(&packet));
+    buf.extend([FP::ZERO; PAD]);
     self.stream_out.write_exact(&buf)
   }
 }
