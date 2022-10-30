@@ -19,6 +19,6 @@ cordic = "0.1.5"
 
 # using air-gapped transmission or wired transmission
 [features]
-default = []
+default = ["wired"]
 wired = []
 nofloat = []

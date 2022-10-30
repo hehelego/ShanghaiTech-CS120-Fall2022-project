@@ -12,11 +12,11 @@ pub struct ChirpUpDown {
 
 impl ChirpUpDown {
   /// the lowest frequency  
-  pub const FA: f32 = 3000.0;
+  pub const FA: f32 = if cfg!(feature = "wired") { 2000.0 } else { 3000.0 };
   /// the highest frequency  
-  pub const FB: f32 = 6000.0;
+  pub const FB: f32 = if cfg!(feature = "wired") { 12000.0 } else { 6000.0 };
   /// number of samples  
-  pub const N: usize = 440;
+  pub const N: usize = if cfg!(feature = "wired") { 80 } else { 440 };
   /// the sampling frequency  
   pub const FS: usize = 48000;
 
