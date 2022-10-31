@@ -119,14 +119,14 @@ where
   /// the ratio of the correlation power to the received signal average power
   /// must be greater than this threshold.
   /// Different threshold should be used for different media.
-  /// - ideal transmission: 0.7
+  /// - ideal transmission: 0.5
   /// - air gapped transmission: 2.0
-  pub const CORR_TO_PWR_MIN: f32 = if cfg!(feature = "wired") { 0.7 } else { 2.0 };
+  pub const CORR_TO_PWR_MIN: f32 = if cfg!(feature = "wired") { 0.5 } else { 2.0 };
   /// Minimum cosine similarity required for preamble detection.
   /// Used to skip irrelevant patterns with extremely high power.
   pub const COSINE_MIN: f32 = 0.4;
   /// The falling edge can be detected about 200 samples after the correlation peak appears.
-  pub const AFTER_PEAK_SAMPLES: usize = 200;
+  pub const AFTER_PEAK_SAMPLES: usize = if cfg!(feature = "wired") { 30 } else { 200 };
 
   /// Create the CorrelationFraming detector with given preamble generator and layload length
   pub fn new<const PAYLOAD_LEN: usize>(preamble_gen: PG) -> CorrelationFraming<PG>

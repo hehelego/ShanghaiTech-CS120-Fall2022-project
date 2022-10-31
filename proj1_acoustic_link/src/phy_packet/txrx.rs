@@ -56,7 +56,8 @@ where
   /// NOTE: write them to the underlying stream together with `write_once`
   fn send(&mut self, packet: PhyPacket) -> Result<(), E> {
     assert_eq!(packet.len(), MM::BYTES_PER_PACKET);
-    let mut buf = Vec::with_capacity(PG::PREAMBLE_LEN + MM::SAMPLES_PER_PACKET);
+    let mut buf = Vec::with_capacity(DefaultConfig::PHYTX_PAD_SAMPLES + PG::PREAMBLE_LEN + MM::SAMPLES_PER_PACKET);
+    buf.extend_from_slice(&[FP::from_f32(0.7); DefaultConfig::PHYTX_PAD_SAMPLES]);
     buf.extend(&self.preamble_samples);
     buf.extend(self.modem.modulate(&packet));
     self.stream_out.write_exact(&buf)

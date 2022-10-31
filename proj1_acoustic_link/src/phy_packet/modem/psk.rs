@@ -15,11 +15,11 @@ impl PSK {
   /// sampling rate of the digital signal
   pub const SAMPLE_RATE: usize = 48000;
   /// frequency of the carrier wave
-  pub const CARRIER_FREQ: f32 = 4800.0;
+  pub const CARRIER_FREQ: f32 = if cfg!(feature = "wired") { 8000.0 } else { 4800.0 };
   /// number of samples used to encode a bit
-  pub const SAMPLES_PER_SYMBOL: usize = 40;
+  pub const SAMPLES_PER_SYMBOL: usize = if cfg!(feature = "wired") { 6 } else { 40 };
   /// number of bits in one packet
-  pub const SYMBOLS_PER_PACKET: usize = 80;
+  pub const SYMBOLS_PER_PACKET: usize = if cfg!(feature = "wired") { 160 } else { 80 };
 }
 impl Modem for PSK {
   const BYTES_PER_PACKET: usize = PSK::SYMBOLS_PER_PACKET / 8;
