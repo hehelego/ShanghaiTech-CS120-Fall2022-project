@@ -1,6 +1,6 @@
 use crate::common::PHY_PACKET_BYTES;
 
-use super::*;
+use super::{Addr, Packet, Seq, Type};
 use rand::{distributions::Standard, Rng};
 
 const TESTS: usize = 100;
