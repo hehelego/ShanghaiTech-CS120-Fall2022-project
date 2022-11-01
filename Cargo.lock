@@ -892,6 +892,10 @@ dependencies = [
 [[package]]
 name = "proj2_multiple_access"
 version = "0.1.0"
+dependencies = [
+ "proj1_acoustic_link",
+ "rand",
+]
 
 [[package]]
 name = "proj3_gateway"
