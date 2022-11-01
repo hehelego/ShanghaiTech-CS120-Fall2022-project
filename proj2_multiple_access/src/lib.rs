@@ -1,14 +1,18 @@
-pub fn add(left: usize, right: usize) -> usize {
-  left + right
-}
+/// Define common things for the MAC layer:
+///
+/// constants
+/// - estimated RTT
+/// - sliding window
+///
+/// helpers
+/// - bit masks
+/// - const function div floor
+/// - const function div ceil
+pub mod common;
 
-#[cfg(test)]
-mod tests {
-  use super::*;
-
-  #[test]
-  fn it_works() {
-    let result = add(2, 2);
-    assert_eq!(result, 4);
-  }
-}
+/// Define the MAC layer packet:
+///
+/// - MAC address
+/// - MAC frame type
+/// - MAC packet
+pub mod packet;
