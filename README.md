@@ -224,3 +224,90 @@ Here, we express our sincere gratefulness to the authors of the following librar
 - [openofdm: an hardware implementation of 802.11 OFDM decoder](https://github.com/jhshi/openofdm):
   We have implemented a phase shifting correction similar to the one in OpenOFDM.
   Our preamble detection algorithm is also inspired by OpenOFDM.
+
+## Project 2: Multiple Access
+
+- See `proj1_acoustic_link` crate for PHY layer optimization for wired-connection
+- See `proj2_multiple_access` crate for MAC implementation
+
+
+### Part 1 From Wireless to Wire
+
+- In `proj1_acoustic_link::phy_packet::modem`, added `line_code::LineCode` for 4b5b+nrzi encoding.
+  We try to utilize digital baseband transmission for wired-connection which have better throughput.
+- In `proj1_acoustic_link::phy_packet::frame_detect` and `proj1_acoustic_link::phy_packet::preamble`,
+  use shorter preamble for each frame to achieve higher efficiency.
+- In `proj2_multiple_access/bin/part1_send.rs` and `proj2_multiple_access/bin/part1_recv.rs`,
+  we send/receive the file directly using PHY layer service.
+
+#### Test
+
+```fish
+git checkout proj2-part1
+cd proj2_multiple_access
+
+# sender
+cargo run --release --bin part1_send
+# receiver
+cargo run --release --bin part1_recv
+
+# checking correctness
+./cmp INPUT.bin OUTPUT.bin
+```
+
+The transmission should finish in about 6 seconds after tx/rx started.  
+There should be no more than 100 bit filps.
+
+### Part 2 A Simple Reliable Link
+
+- In `proj2_multiple_access/bin/part2_send.rs` and `proj2_multiple_access/bin/part2_recv.rs`,
+  we introduce ACK mechanism, that is:
+  1. Tx sends every data chunk and its sequence number to Rx
+  2. Rx reply ACK with the sequence number if a data chunk can be correctly decoded.
+  3. Tx wait for `ACK_TIMEOUT` time and try to receive ACK packets from Rx.
+  4. Tx tries to re-send the data chunks whose ACK never come after `ACK_TIMEOUT` time.
+  5. Repeat the above steps until Tx/Rx find out that all the data chunks are correctly delivered.
+
+#### Test
+
+```fish
+git checkout proj2-part1
+cd proj2_multiple_access
+
+# sender
+cargo run --release --bin part2_send
+# receiver
+cargo run --release --bin part2_recv
+
+# checking correctness
+./cmp INPUT.bin OUTPUT.bin
+```
+
+- The transmission should finish in about 9 seconds after tx/rx started.
+- There should be no bit filps.
+- If we unplug the wire during transmission, sender should detect and report `link error` after 20 seconds.
+
+
+### Part 3 CSMA
+
+Not done yet.
+
+### Part 4 macperf Utility
+
+Failed to meet the performance requirements
+
+### Part 5 macping Utility
+
+Failed to meet the performance requirements
+
+### Part 6 Collision Detection
+
+Not done yet.
+
+### Part 7 Performance Rank
+
+Not done yet.
+
+### Acknowledgement
+
+- [WARP project](https://warpproject.org/trac/wiki/CSMAMAC) for CSMA MAC reference design
