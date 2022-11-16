@@ -1,3 +1,6 @@
+use std::time::Duration;
+
+use super::PhyTrait;
 pub use crate::phy_packet::{Modem, PhyPacket, PreambleGen};
 pub use crate::traits::{PacketReceiver, PacketSender};
 use config::*;
@@ -7,17 +10,25 @@ use config::*;
 pub struct PlainPHY {
   tx: Tx,
   rx: Rx,
+  power_probe: PowerProbe,
 }
 
 impl PlainPHY {
-  /// number of bytes in one packet
-  pub const PACKET_BYTES: usize = ModemMethod::BYTES_PER_PACKET;
   /// number of samples in one packet
   pub const PACKET_SAMPLES: usize = Tx::SAMPLES_PER_PACKET;
 
   /// combine a sender and a receiver to get a physics layer object
-  pub fn new(tx: Tx, rx: Rx) -> Self {
-    Self { tx, rx }
+  pub fn new(tx: Tx, rx: Rx, power_probe: PowerProbe) -> Self {
+    Self { tx, rx, power_probe }
+  }
+}
+
+impl PhyTrait<(), ()> for PlainPHY {
+  const PACKET_BYTES: usize = ModemMethod::BYTES_PER_PACKET;
+  const ESTIMATED_RTT: Duration = ESTIMATED_RTT;
+
+  fn channel_free(&self) -> bool {
+    self.power_probe.power() < REST_POWER
   }
 }
 
@@ -37,6 +48,10 @@ impl PacketReceiver<PhyPacket, ()> for PlainPHY {
   fn recv_timeout(&mut self, timeout: std::time::Duration) -> Result<PhyPacket, ()> {
     self.rx.recv_timeout(timeout)
   }
+
+  fn recv_peek(&mut self) -> bool {
+    self.rx.recv_peek()
+  }
 }
 
 impl Default for PlainPHY {
@@ -47,7 +62,8 @@ impl Default for PlainPHY {
       ModemMethod::default(),
       FrameDetector::new::<{ ModemMethod::SAMPLES_PER_PACKET }>(Preamble::new()),
     );
-    Self::new(tx, rx)
+    let power_probe = PowerProbe::default();
+    Self::new(tx, rx, power_probe)
   }
 }
 

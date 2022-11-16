@@ -2,14 +2,14 @@ use cpal::{
   traits::{DeviceTrait, HostTrait, StreamTrait},
   BuildStreamError, Device, StreamConfig,
 };
+use parking_lot::Mutex;
+use std::{collections::VecDeque, sync::Arc};
 
 use crate::{
   block_buffer::ConcurrentBuffer,
-  traits::{InStream, OutStream},
+  traits::{InStream, OutStream, Sample, FP},
   DefaultConfig,
 };
-
-use crate::traits::{Sample, FP};
 
 /// An input stream built on cpal input stream. Support reading PCM samples.
 /// The `CpalInStream` fetch samples from a `cpal::Stream`
@@ -22,6 +22,11 @@ pub struct CpalInStream {
 pub struct CpalOutStream {
   stream: cpal::Stream,
   buffer: ConcurrentBuffer<FP>,
+}
+/// monitoring the power level on a cpal stream
+pub struct CpalPowerProbe {
+  _stream: cpal::Stream,
+  power: Arc<Mutex<f32>>,
 }
 
 impl CpalInStream {
@@ -87,7 +92,7 @@ impl CpalOutStream {
     self.stream.pause().unwrap();
   }
   /// Clear the samples not played.
-  pub fn clear(&self) {
+  pub fn clear(&mut self) {
     self.buffer.clear()
   }
 
@@ -100,6 +105,36 @@ impl CpalOutStream {
       .zip(cast_buf.iter())
       .for_each(|(x, y)| *x = FP::into_f32(*y));
     data[read_size..].iter_mut().for_each(|x| *x = 0.0);
+  }
+}
+
+impl CpalPowerProbe {
+  /// create and start to listen on a input stream
+  pub fn new(input_device: Device, stream_config: StreamConfig) -> Result<Self, BuildStreamError> {
+    let power = Arc::new(Mutex::new(0.0));
+    let pw = power.clone();
+    let mut power_queue = VecDeque::with_capacity(DefaultConfig::PWR_PROBE_WIND);
+    let _stream = input_device.build_input_stream(
+      &stream_config,
+      move |data: &[f32], _| {
+        let mut pw = pw.lock();
+        data.iter().for_each(|&x| {
+          if power_queue.len() == DefaultConfig::PWR_PROBE_WIND {
+            let y = power_queue.pop_front().unwrap();
+            *pw -= y * y;
+          }
+          power_queue.push_back(x);
+          *pw += x * x;
+        });
+      },
+      |e| eprintln!("An error occured at cpal input stream {}", e),
+    )?;
+    Ok(CpalPowerProbe { _stream, power })
+  }
+  /// probe the power on the input stream
+  pub fn power(&self) -> f32 {
+    let power = self.power.lock();
+    *power / DefaultConfig::PWR_PROBE_WIND as f32
   }
 }
 
@@ -153,5 +188,19 @@ impl OutStream<FP, ()> for CpalOutStream {
   /// Write exactly `buf.len()` samples to the stream. This function will not return until all the samples are written.
   fn write_exact(&mut self, buf: &[FP]) -> Result<(), ()> {
     self.buffer.write_exact(buf)
+  }
+
+  /// forward to `ConcurrentBuffer::wait`
+  fn wait(&mut self) {
+    self.buffer.wait()
+  }
+}
+
+impl Default for CpalPowerProbe {
+  fn default() -> Self {
+    let host = cpal::default_host();
+    let input_device = host.default_input_device().expect("no default input device available");
+    let stream_config = DefaultConfig::new();
+    Self::new(input_device, stream_config).expect("failed to create input stream")
   }
 }

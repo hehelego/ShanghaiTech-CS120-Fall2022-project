@@ -40,6 +40,10 @@ impl<T> Buffer<T> {
   pub fn clear(&mut self) {
     self.blocks.clear();
   }
+
+  pub fn empty(&self) -> bool {
+    self.blocks.is_empty()
+  }
 }
 
 impl<T: Clone> Buffer<T> {

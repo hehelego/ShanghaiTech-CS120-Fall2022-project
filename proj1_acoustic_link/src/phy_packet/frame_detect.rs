@@ -7,13 +7,12 @@ use std::collections::VecDeque;
 enum FramingState {
   DetectPreambleStart,
   DetectRisingEdge,
-  DetectFallingEdge,
   WaitPayload,
 }
 
 // Window for store the samples temporarily.
 struct PreambleWindow {
-  buffer: VecDeque<FP>,
+  pub(self) buffer: VecDeque<FP>,
   // The two index will continous increase during one detection session, and reset to zero after detecting one package.
   head_index: usize,
   tail_index: usize,
@@ -37,18 +36,12 @@ impl PreambleWindow {
   pub fn len(&self) -> usize {
     self.buffer.len()
   }
-  pub fn iter(&self) -> impl ExactSizeIterator<Item = &'_ FP> {
-    self.buffer.iter()
-  }
-  pub fn norm(&self) -> FP {
-    self.square_sum.sqrt()
-  }
+
   pub fn update(&mut self, sample: FP) {
     self.tail_index += 1;
     self.buffer.push_back(sample);
     self.square_sum += sample * sample;
-    self.smooth_power =
-      self.smooth_power * FP::from_f32(63.0) / FP::from_f32(64.0) + sample * sample / FP::from_f32(64.0);
+    self.smooth_power = self.smooth_power * FP::from_f32(31.0 / 32.0) + sample * sample / FP::from_f32(32.0);
     // Pop the steal sample
     if self.buffer.len() > self.capacity {
       let old_sample = self.buffer.pop_front().unwrap();
@@ -58,7 +51,9 @@ impl PreambleWindow {
   }
   // Extract the samples from `index + 1` to the end of the buffer.
   pub fn extract_samples_to_end(&mut self, index: usize) -> Vec<FP> {
+    assert!(index >= self.head_index);
     let start = index - self.head_index;
+    assert!(start < self.buffer.len());
     self.buffer.range(start..).cloned().collect()
   }
   pub fn clear(&mut self) {
@@ -118,24 +113,22 @@ where
   /// For preamble detection,
   /// the ratio of the correlation power to the received signal average power
   /// must be greater than this threshold.
-  /// Different threshold should be used for different media.
-  /// - ideal transmission: 0.5
-  /// - air gapped transmission: 2.0
-  pub const CORR_TO_PWR_MIN: f32 = if cfg!(feature = "wired") { 0.5 } else { 2.0 };
-  /// Minimum cosine similarity required for preamble detection.
-  /// Used to skip irrelevant patterns with extremely high power.
-  pub const COSINE_MIN: f32 = 0.4;
-  /// The falling edge can be detected about 200 samples after the correlation peak appears.
-  pub const AFTER_PEAK_SAMPLES: usize = if cfg!(feature = "wired") { 30 } else { 200 };
+  pub const CORR_MIN: f32 = 3.0;
+  /// The falling edge can be detected about 70 samples after the correlation peak appears.
+  pub const AFTER_PEAK_SAMPLES: usize = 200;
+  /// The minimum power required in detect window when detecting preamble
+  /// Used to skip irrelevant patterns with extremely low power.
+  /// **TODO** Currently only enabled for wired connection, find a proper value for wireless case
+  /// **TODO** Find a proper value and proper volume configuration
+  pub const POWER_MIN: f32 = if cfg!(feature = "wired") { 0.05 / 64.0 } else { 0.0 };
 
   /// Create the CorrelationFraming detector with given preamble generator and layload length
   pub fn new<const PAYLOAD_LEN: usize>(preamble_gen: PG) -> CorrelationFraming<PG>
   where
     PG: PreambleGen,
   {
-    println!("Detect Preamble Start");
     Self {
-      detect_window: PreambleWindow::with_capacity(PG::PREAMBLE_LEN),
+      detect_window: PreambleWindow::with_capacity(PG::PREAMBLE_LEN + Self::AFTER_PEAK_SAMPLES),
       state: FramingState::DetectPreambleStart,
       frame_payload: Payload::new::<PAYLOAD_LEN>(),
       corr_peak_index: 0,
@@ -152,11 +145,12 @@ where
       return FramingState::DetectPreambleStart;
     }
     // To check if is the beginning of the preamble
-    let (corr2pwr, cosine_sim) = self.calculate_relations();
-    if corr2pwr >= FP::from_f32(Self::CORR_TO_PWR_MIN) && cosine_sim >= FP::from_f32(Self::COSINE_MIN) {
-      self.corr_peak_value = corr2pwr;
+    let corr = self.corr();
+    let pwr = self.detect_window.smooth_power;
+    if corr.into_f32() > Self::CORR_MIN && pwr.into_f32() > Self::POWER_MIN {
+      self.corr_peak_value = corr;
       self.corr_peak_index = self.detect_window.tail_index;
-      println!("Log: Detect Rising Edge");
+      println!("goto detect rise {}", self.corr_peak_index);
       FramingState::DetectRisingEdge
     } else {
       // Wait for preambles
@@ -168,36 +162,25 @@ where
   fn detect_rising_edge(&mut self, sample: FP) -> FramingState {
     self.detect_window.update(sample);
     // Get the data.
-    let (corr2pwr, cosine_sim) = self.calculate_relations();
-    if corr2pwr < self.corr_peak_value || cosine_sim < FP::from_f32(Self::COSINE_MIN) {
-      println!("Log: Detect Falling Edge");
-      return FramingState::DetectFallingEdge;
-    }
-    self.corr_peak_value = corr2pwr;
-    self.corr_peak_index = self.detect_window.tail_index;
-    FramingState::DetectRisingEdge
-  }
-
-  fn detect_falling_edge(&mut self, sample: FP) -> FramingState {
-    self.detect_window.update(sample);
-    // If we have found the tail.
-    if self.detect_window.tail_index - self.corr_peak_index > Self::AFTER_PEAK_SAMPLES {
+    let corr = self.corr();
+    if corr > self.corr_peak_value {
+      self.corr_peak_value = corr;
+      self.corr_peak_index = self.detect_window.tail_index;
+    } else if self.detect_window.tail_index - self.corr_peak_index > Self::AFTER_PEAK_SAMPLES {
+      println!("  into wait, corr: {:?}", self.corr_peak_value);
       self
         .frame_payload
         .extend(self.detect_window.extract_samples_to_end(self.corr_peak_index));
-      println!("Log: Wait Payload. Peak index: {}", self.corr_peak_index);
       self.reset_detection_state();
-      println!("Log: Wait Payload");
-      FramingState::WaitPayload
-    } else {
-      FramingState::DetectFallingEdge
+      return FramingState::WaitPayload;
     }
+    FramingState::DetectRisingEdge
   }
 
   fn wait_payload(&mut self, sample: FP) -> (FramingState, Option<FramePayload>) {
-    // assert!(self.frame_payload.len() < self.frame_payload.capacity());
     // append the newly found sample into the payload window
     if let Some(payload) = self.frame_payload.update(sample) {
+      println!("  return to start, frame found");
       (FramingState::DetectPreambleStart, Some(payload))
     } else {
       (FramingState::WaitPayload, None)
@@ -206,11 +189,10 @@ where
   }
 
   // Calculate the relations between preamble and samples. Return the ratio of correlation power to the received signal average power and cosine similarity.
-  fn calculate_relations(&self) -> (FP, FP) {
-    let dot = dot_product(self.detect_window.iter(), self.preamble_gen.iter());
-    let corr2pwr = (dot / FP::from_f32(self.preamble_gen.len() as f32)) / self.detect_window.smooth_power;
-    let cosine_sim = dot / self.preamble_gen.norm() / self.detect_window.norm();
-    (corr2pwr, cosine_sim)
+  fn corr(&self) -> FP {
+    let r = self.detect_window.len();
+    let pl = self.preamble_gen.len();
+    dot_product(self.detect_window.buffer.range(r - pl..r), self.preamble_gen.iter())
   }
 
   // reset the fields relatated to preable detection.
@@ -238,10 +220,6 @@ where
       }
       FramingState::DetectRisingEdge => {
         self.state = self.detect_rising_edge(sample);
-        None
-      }
-      FramingState::DetectFallingEdge => {
-        self.state = self.detect_falling_edge(sample);
         None
       }
     }

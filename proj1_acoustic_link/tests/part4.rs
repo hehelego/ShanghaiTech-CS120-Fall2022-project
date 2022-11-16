@@ -1,7 +1,7 @@
 use proj1_acoustic_link::{
   helper::*,
   phy_layer::AtomicPHY,
-  phy_layer::PacketError,
+  phy_layer::AtomicPhyRecvErr,
   traits::{PacketReceiver, PacketSender},
 };
 use reed_solomon_erasure::{galois_8::Field, ReedSolomon};
@@ -50,7 +50,7 @@ fn part4_recv() {
   let mut cur_chk = 0;
   while cur_chk < chunks.len() {
     match phy.recv_timeout(Duration::from_secs(1)) {
-      Err(PacketError::NoPacketAvaiable) => break,
+      Err(AtomicPhyRecvErr::NoPacketAvaiable) => break,
       Ok((packet, skips)) => {
         cur_chk += skips as usize;
         println!("get packet[{}]", cur_chk);
@@ -59,8 +59,8 @@ fn part4_recv() {
         }
         cur_chk += 1;
       }
-      Err(PacketError::Lost) => continue,
-      Err(PacketError::Corrupt) => continue,
+      Err(AtomicPhyRecvErr::Lost) => continue,
+      Err(AtomicPhyRecvErr::Corrupt) => continue,
     }
   }
 

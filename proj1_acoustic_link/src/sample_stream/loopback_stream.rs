@@ -39,4 +39,8 @@ impl OutStream<FP, ()> for LoopBackStream {
   fn write_exact(&mut self, buf: &[FP]) -> Result<(), ()> {
     self.0.write_exact(buf)
   }
+  /// wait for other thread to extract the samples
+  fn wait(&mut self) {
+    self.0.wait()
+  }
 }

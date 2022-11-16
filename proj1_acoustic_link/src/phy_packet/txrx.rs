@@ -3,9 +3,9 @@ use crate::{
   traits::{InStream, OutStream, PacketReceiver, PacketSender, Sample, FP},
   DefaultConfig,
 };
+use crossbeam::channel::{unbounded as unbounded_channel, Receiver, Sender};
 use std::{
   marker::PhantomData,
-  sync::mpsc::{channel, Receiver, Sender},
   thread::{self, JoinHandle},
   time::{Duration, Instant},
 };
@@ -56,11 +56,12 @@ where
   /// NOTE: write them to the underlying stream together with `write_once`
   fn send(&mut self, packet: PhyPacket) -> Result<(), E> {
     assert_eq!(packet.len(), MM::BYTES_PER_PACKET);
-    let mut buf = Vec::with_capacity(DefaultConfig::PHYTX_PAD_SAMPLES + PG::PREAMBLE_LEN + MM::SAMPLES_PER_PACKET);
-    buf.extend_from_slice(&[FP::from_f32(0.7); DefaultConfig::PHYTX_PAD_SAMPLES]);
+    let mut buf = Vec::with_capacity(PG::PREAMBLE_LEN + MM::SAMPLES_PER_PACKET);
     buf.extend(&self.preamble_samples);
     buf.extend(self.modem.modulate(&packet));
-    self.stream_out.write_exact(&buf)
+    let n = self.stream_out.write_exact(&buf)?;
+    self.stream_out.wait();
+    Ok(n)
   }
 }
 
@@ -97,7 +98,7 @@ where
   fn worker(mut stream_in: SS, mut frame_detector: FD, frame_playload_rx: Sender<FramePayload>, exit_rx: Receiver<()>) {
     // TODO: select a proper interval
     let fetch_interval =
-      Duration::from_secs_f32(8.0 * DefaultConfig::BUFFER_SIZE as f32 / DefaultConfig::SAMPLE_RATE as f32);
+      Duration::from_secs_f32(2.0 * DefaultConfig::BUFFER_SIZE as f32 / DefaultConfig::SAMPLE_RATE as f32);
     let last_fetch = Instant::now() - fetch_interval;
     // TODO: select a proper buffer size
     let mut buf = [Sample::ZERO; DefaultConfig::BUFFER_SIZE * 8];
@@ -115,8 +116,8 @@ where
   }
 
   pub fn new(stream_in: SS, modem: MM, frame_detector: FD) -> Self {
-    let (exit_tx, exit_rx) = channel();
-    let (frame_playload_tx, frame_payload_rx) = channel();
+    let (exit_tx, exit_rx) = unbounded_channel();
+    let (frame_playload_tx, frame_payload_rx) = unbounded_channel();
     let handler = thread::spawn(move || Self::worker(stream_in, frame_detector, frame_playload_tx, exit_rx));
     Self {
       _pg: PhantomData::default(),
@@ -151,6 +152,10 @@ where
       Ok(payload) => Ok(self.modem.demodulate(&payload)),
       Err(_) => Err(()),
     }
+  }
+
+  fn recv_peek(&mut self) -> bool {
+    !self.frame_payload_rx.is_empty()
   }
 }
 

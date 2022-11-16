@@ -39,6 +39,10 @@ impl PacketReceiver<PhyPacket, ()> for HighBpsPHY {
   fn recv_timeout(&mut self, timeout: std::time::Duration) -> Result<PhyPacket, ()> {
     self.rx.recv_timeout(timeout)
   }
+
+  fn recv_peek(&mut self) -> bool {
+    self.rx.recv_peek()
+  }
 }
 
 impl Default for HighBpsPHY {

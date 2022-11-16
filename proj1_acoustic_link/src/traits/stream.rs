@@ -19,4 +19,6 @@ pub trait OutStream<T, E> {
   /// Write data from a slice.
   /// The function will not return until all the data are written.
   fn write_exact(&mut self, buf: &[T]) -> Result<(), E>;
+  /// Wait until the output stream buffer is empty, all the data are fetched
+  fn wait(&mut self);
 }

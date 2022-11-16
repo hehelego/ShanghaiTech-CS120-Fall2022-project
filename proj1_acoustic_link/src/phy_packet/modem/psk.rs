@@ -19,7 +19,7 @@ impl PSK {
   /// number of samples used to encode a bit
   pub const SAMPLES_PER_SYMBOL: usize = if cfg!(feature = "wired") { 6 } else { 40 };
   /// number of bits in one packet
-  pub const SYMBOLS_PER_PACKET: usize = if cfg!(feature = "wired") { 160 } else { 80 };
+  pub const SYMBOLS_PER_PACKET: usize = if cfg!(feature = "wired") { 400 } else { 80 };
 }
 impl Modem for PSK {
   const BYTES_PER_PACKET: usize = PSK::SYMBOLS_PER_PACKET / 8;

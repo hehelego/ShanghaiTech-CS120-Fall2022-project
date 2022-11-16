@@ -76,4 +76,7 @@ impl<W: Write + Seek> OutStream<FP, WavError> for HoundOutStream<W> {
   fn write_exact(&mut self, buf: &[FP]) -> Result<(), WavError> {
     self.write(buf).map(|_| ())
   }
+
+  /// do not need to wait
+  fn wait(&mut self) {}
 }

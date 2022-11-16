@@ -1,11 +1,13 @@
-use rand::{Rng, RngCore};
+use bitvec::prelude::*;
+use rand::{distributions::Standard, Rng, RngCore};
 
-use super::{add_padding, remove_padding, CrcSeq};
+use super::{add_padding, decode_4b5b, decode_nrzi, encode_4b5b, encode_nrzi, remove_padding, CrcSeq};
+
+type CS = CrcSeq<9>;
+const TESTS: usize = 100;
 
 #[test]
 fn pad_add_remove() {
-  use rand::Rng;
-  const TESTS: usize = 20;
   for _ in 0..TESTS {
     let mut rng = rand::thread_rng();
     let data_len: usize = rng.gen_range(1000..2000);
@@ -19,9 +21,6 @@ fn pad_add_remove() {
     assert_eq!(data_pad, data)
   }
 }
-
-type CS = CrcSeq<9>;
-const CS_TESTS: usize = 100;
 
 fn gen_pack() -> Vec<u8> {
   let mut rng = rand::thread_rng();
@@ -39,7 +38,7 @@ fn flip_bit(data: &mut [u8]) {
 
 #[test]
 fn crcseq_ok() {
-  for _ in 0..CS_TESTS {
+  for _ in 0..TESTS {
     let pack = gen_pack();
     if let Some((data, seq)) = CS::unpack(&pack) {
       assert_eq!(CS::pack(&data, seq), pack)
@@ -50,9 +49,31 @@ fn crcseq_ok() {
 }
 #[test]
 fn crcseq_err() {
-  for _ in 0..CS_TESTS {
+  for _ in 0..TESTS {
     let mut pack = gen_pack();
     flip_bit(&mut pack);
     assert_eq!(CS::unpack(&pack), None);
+  }
+}
+
+#[test]
+fn fbfb() {
+  for _ in 0..TESTS {
+    let bytes: Vec<u8> = rand::thread_rng().sample_iter(Standard).take(1).collect();
+    let bits = bytes.view_bits();
+    let enc = encode_4b5b(bits.to_owned());
+    let dec = decode_4b5b(enc);
+    assert_eq!(dec, bits);
+  }
+}
+
+#[test]
+fn nrzi(){
+  for _ in 0..TESTS {
+    let bytes: Vec<u8> = rand::thread_rng().sample_iter(Standard).take(1).collect();
+    let bits = bytes.view_bits();
+    let enc = encode_nrzi(bits.to_owned());
+    let dec = decode_nrzi(enc);
+    assert_eq!(dec, bits);
   }
 }

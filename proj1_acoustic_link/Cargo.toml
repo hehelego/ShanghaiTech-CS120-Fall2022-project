@@ -16,6 +16,9 @@ rustfft = "6.0"
 az = "1.2.1"
 fixed = "1.19"
 cordic = "0.1.5"
+crossbeam = "0.8"
+parking_lot = "0.12"
+bitvec = "1.0"
 
 # using air-gapped transmission or wired transmission
 [features]

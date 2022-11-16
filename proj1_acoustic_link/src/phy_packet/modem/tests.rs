@@ -40,14 +40,29 @@ fn test_noisy<T: Modem, D: Distribution<f32>>(mut modem: T, noise_dist: D) {
 #[test]
 fn psk_ideal() {
   for _ in 0..MODEM_TESTS {
-    test_ideal(super::PSK::new());
+    test_ideal(crate::phy_packet::modem::psk::PSK::new());
   }
 }
 /// PSK decode in noisy channel, where the noise is distributed as Uniform(-1,+1).
 #[test]
 fn psk_noise() {
   for _ in 0..MODEM_TESTS {
-    test_noisy(super::PSK::new(), Standard);
+    test_noisy(crate::phy_packet::modem::psk::PSK::new(), Standard);
+  }
+}
+
+/// mutli-PSK decode in an ideal channel
+#[test]
+fn multipsk_ideal() {
+  for _ in 0..MODEM_TESTS {
+    test_ideal(crate::phy_packet::modem::proj2_modem::PSK::new());
+  }
+}
+/// multi-PSK decode in noisy channel, where the noise is distributed as Uniform(-1,+1).
+#[test]
+fn multipsk_noise() {
+  for _ in 0..MODEM_TESTS {
+    test_noisy(crate::phy_packet::modem::proj2_modem::PSK::new(), Standard);
   }
 }
 
@@ -96,4 +111,19 @@ fn ofdm_wav_once() {
     .flat_map(|pack| modem.demodulate(pack))
     .collect();
   assert_eq!(bytes.as_slice(), decoded.as_slice());
+}
+
+/// line code decode in an ideal channel
+#[test]
+fn lc_ideal() {
+  for _ in 0..MODEM_TESTS {
+    test_ideal(super::LineCode::new());
+  }
+}
+/// line code decode in noisy channel, where the noise is distributed as Uniform(-1,+1).
+#[test]
+fn lc_noise() {
+  for _ in 0..MODEM_TESTS {
+    test_noisy(super::LineCode::new(), Standard);
+  }
 }

@@ -1,11 +1,11 @@
-use super::PlainPHY;
+use super::{PhyTrait, PlainPHY};
 use crate::helper::{CrcSeq, SEQ_MOD};
 pub use crate::phy_packet::{Modem, PhyPacket, PreambleGen};
 pub use crate::traits::{PacketReceiver, PacketSender};
 
 #[derive(Debug)]
 /// packet receive error
-pub enum PacketError {
+pub enum AtomicPhyRecvErr {
   /// the packet is lost in transmission
   Lost,
   /// the packet is received but corrupted
@@ -49,27 +49,27 @@ impl PacketSender<PhyPacket, ()> for AtomicPHY {
 impl AtomicPHY {
   /// verify data integrity with crc+seq,
   /// return the data section and number of skipped packets
-  fn on_packet_arrived(&mut self, packet: PhyPacket) -> Result<(PhyPacket, u8), PacketError> {
+  fn on_packet_arrived(&mut self, packet: PhyPacket) -> Result<(PhyPacket, u8), AtomicPhyRecvErr> {
     if let Some((packet, seq)) = CS::unpack(&packet) {
       let skip = (SEQ_MOD + seq - self.rx_seq) % SEQ_MOD;
       self.rx_seq = (seq + 1) % SEQ_MOD;
       Ok((packet, skip))
     } else {
-      Err(PacketError::Corrupt)
+      Err(AtomicPhyRecvErr::Corrupt)
     }
   }
 }
-impl PacketReceiver<(PhyPacket, u8), PacketError> for AtomicPHY {
+impl PacketReceiver<(PhyPacket, u8), AtomicPhyRecvErr> for AtomicPHY {
   /// Receive a packet immediately.  
   /// Success: A tuple of
   /// - the received packet and
   /// - the number of lost/corrupted packets since last success.
   /// Failed: [`PacketError`] type: no packet, packet corrupt, packet lost
-  fn recv(&mut self) -> Result<(PhyPacket, u8), PacketError> {
+  fn recv(&mut self) -> Result<(PhyPacket, u8), AtomicPhyRecvErr> {
     if let Ok(packet) = self.txrx.recv() {
       self.on_packet_arrived(packet)
     } else {
-      Err(PacketError::NoPacketAvaiable)
+      Err(AtomicPhyRecvErr::NoPacketAvaiable)
     }
   }
 
@@ -79,11 +79,15 @@ impl PacketReceiver<(PhyPacket, u8), PacketError> for AtomicPHY {
   /// - the received packet and
   /// - the number of lost/corrupted packets since last success.
   /// Failed: [`PacketError`] type: no packet, packet corrupt, packet lost
-  fn recv_timeout(&mut self, timeout: std::time::Duration) -> Result<(PhyPacket, u8), PacketError> {
+  fn recv_timeout(&mut self, timeout: std::time::Duration) -> Result<(PhyPacket, u8), AtomicPhyRecvErr> {
     if let Ok(packet) = self.txrx.recv_timeout(timeout) {
       self.on_packet_arrived(packet)
     } else {
-      Err(PacketError::NoPacketAvaiable)
+      Err(AtomicPhyRecvErr::NoPacketAvaiable)
     }
+  }
+
+  fn recv_peek(&mut self) -> bool {
+    self.txrx.recv_peek()
   }
 }
