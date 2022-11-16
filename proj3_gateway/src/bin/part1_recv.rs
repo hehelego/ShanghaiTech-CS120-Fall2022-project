@@ -8,7 +8,7 @@ struct Cli {
 }
 
 fn main() -> std::io::Result<()> {
-  const SELF_ADDR: &str = "127.0.0.1";
+  const SELF_ADDR: &str = "0.0.0.0";
   const DATA_SIZE: usize = 20;
   const DATA_NUM: usize = 10;
 

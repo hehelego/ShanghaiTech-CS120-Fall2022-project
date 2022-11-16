@@ -22,7 +22,7 @@ fn main() -> std::io::Result<()> {
   const PAYLOAD_BYTES: usize = 20;
   const LOOP_TIME: usize = 10;
   const SEND_INTERVAL: Duration = Duration::from_secs(1);
-  const UDP_ADDR: &str = "127.0.0.1";
+  const UDP_ADDR: &str = "0.0.0.0";
 
   // Delay the start for 1 secs
   thread::sleep(Duration::from_secs(1));
