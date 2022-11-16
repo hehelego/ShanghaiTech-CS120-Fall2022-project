@@ -10,3 +10,4 @@ rand = "0.8"
 
 [dependencies]
 proj1_acoustic_link = { path = "../proj1_acoustic_link", features = ["wired"] }
+crossbeam-channel = "0.5"
