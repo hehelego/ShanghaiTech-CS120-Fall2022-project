@@ -1,4 +1,4 @@
-use super::{PhyTrait, PlainPHY};
+use super::{PhyLayer, PlainPHY};
 use crate::helper::{CrcSeq, SEQ_MOD};
 pub use crate::phy_packet::{Modem, PhyPacket, PreambleGen};
 pub use crate::traits::{PacketReceiver, PacketSender};

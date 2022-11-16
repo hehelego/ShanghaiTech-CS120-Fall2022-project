@@ -1,6 +1,6 @@
 /// PHY layer type traits: send+recv+probe
 mod traits;
-pub use traits::PhyLayer as PhyTrait;
+pub use traits::PhyLayer;
 
 /// the plain physics layer
 mod plain;
@@ -26,6 +26,4 @@ mod mocking;
 pub use mocking::MockingPhy;
 
 /// the default PHY layer implementation is CRC PHY
-pub type PhyLayer = CrcPhy;
-/// the default PHY layer implementation receiver error type
-pub type PhyRecvErr = CrcPhyRecvErr;
+pub type DefaultPhy = CrcPhy;
