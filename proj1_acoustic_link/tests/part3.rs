@@ -1,6 +1,6 @@
 use proj1_acoustic_link::{
   helper::*,
-  phy_layer::{PhyTrait, PlainPHY},
+  phy_layer::{PhyLayer, PlainPHY},
   traits::{PacketReceiver, PacketSender},
 };
 use std::fs;

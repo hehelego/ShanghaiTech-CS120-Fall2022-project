@@ -3,7 +3,7 @@
 #[test]
 fn plain_benchmark() {
   use proj1_acoustic_link::{
-    phy_layer::{CrcPhy as PHY, PhyTrait},
+    phy_layer::{CrcPhy as PHY, PhyLayer},
     traits::{PacketReceiver, PacketSender},
   };
   use rand::{distributions::Standard, Rng};

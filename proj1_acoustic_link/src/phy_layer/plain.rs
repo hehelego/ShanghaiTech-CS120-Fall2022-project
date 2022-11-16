@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use super::PhyTrait;
+use super::PhyLayer;
 pub use crate::phy_packet::{Modem, PhyPacket, PreambleGen};
 pub use crate::traits::{PacketReceiver, PacketSender};
 use config::*;
@@ -23,7 +23,9 @@ impl PlainPHY {
   }
 }
 
-impl PhyTrait<(), ()> for PlainPHY {
+impl PhyLayer for PlainPHY {
+  type SendErr = ();
+  type RecvErr = ();
   const PACKET_BYTES: usize = ModemMethod::BYTES_PER_PACKET;
   const ESTIMATED_RTT: Duration = ESTIMATED_RTT;
 

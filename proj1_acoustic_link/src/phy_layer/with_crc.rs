@@ -1,4 +1,4 @@
-use super::{PhyTrait, PlainPHY};
+use super::{PhyLayer, PlainPHY};
 pub use crate::phy_packet::{Modem, PhyPacket, PreambleGen};
 pub use crate::traits::{PacketReceiver, PacketSender};
 use std::time::Duration;
@@ -60,7 +60,10 @@ impl CrcPhy {
   }
 }
 
-impl PhyTrait<(), CrcPhyRecvErr> for CrcPhy {
+impl PhyLayer for CrcPhy {
+  type SendErr = ();
+  type RecvErr = CrcPhyRecvErr;
+
   /// number of data bytes in one packet, 2 bytes used for CRC16
   const PACKET_BYTES: usize = PlainPHY::PACKET_BYTES - Self::CRC_BYTES;
   const ESTIMATED_RTT: Duration = PlainPHY::ESTIMATED_RTT;
