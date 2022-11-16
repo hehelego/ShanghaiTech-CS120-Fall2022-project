@@ -55,7 +55,9 @@ where
   MAC: MacStateMachine<PHY>,
 {
   /// maximum transmission unit in bytes
-  pub const MTU: usize = PHY::PACKET_BYTES;
+  pub const MTU: usize = MacPacket::<PHY>::PAYLOAD_SIZE;
+
+  /// crate a new MAC layer on a given PHY layer.
   pub fn new(addr: MacAddr, phy: PHY) -> Self {
     let (pack_send, packets_to_send) = channel();
     let (packets_received, pack_recv) = channel();
@@ -137,6 +139,7 @@ where
   PHY: PhyLayer + Default + Send + 'static,
   MAC: MacStateMachine<PHY>,
 {
+  /// create a MAC layer object based on the default PHY layer.
   pub fn new_with_default_phy(addr: MacAddr) -> Self {
     Self::new(addr, PHY::default())
   }
@@ -147,6 +150,7 @@ where
   PHY: PhyLayer + Send + 'static,
   MAC: MacStateMachine<PHY>,
 {
+  /// wait for the state machine to stop
   fn drop(&mut self) {
     self.terminate_signal.send(()).unwrap();
     if let Some(worker) = self.worker_handler.take() {
