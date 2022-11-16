@@ -16,3 +16,4 @@ pub mod common;
 /// - MAC frame type
 /// - MAC packet
 pub mod packet;
+pub use packet::{MacAddr, MacFlags, MacPacket, MacSeq};
