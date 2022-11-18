@@ -8,3 +8,5 @@ edition = "2021"
 [dependencies]
 clap = { version = "4.0", features = ["derive"] }
 rand = "0.8"
+pnet = "0.31"
+socket2 = { version = "0.4", features = ["all"] }
