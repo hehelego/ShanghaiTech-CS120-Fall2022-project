@@ -109,7 +109,17 @@ Behavior:
     2. lookup `tcp_socks` or `udp_socks`
     3. send the packet to the corresponding unix domain socket
 
-### gateway node
+### gateway+NAT node
+
+Similar to internal node.
+We also have a Athernet network layer provider process.
+
+However
+
+- We forward the packets comming from Athernet network layer provider via OS TCP/UDP/ICMP sockets.
+- When receiving packets from OS sockets, we redirect them to Athernet internal node via Athernet network provider.
+
+**TODO**
 
 ## references
 
