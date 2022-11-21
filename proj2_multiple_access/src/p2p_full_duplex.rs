@@ -55,6 +55,7 @@ impl Simple {
   fn check_and_send_packet(&mut self) {
     while self.can_send_packet() {
       let packet = self.packets_to_send.recv().unwrap();
+      println!("Send package {:?}", packet.seq);
       self.phy.send(packet.into_phy()).unwrap();
       self.pending_packets.push_back(PendingPacket::with_packet(packet));
     }
@@ -62,6 +63,7 @@ impl Simple {
   fn check_and_resend_packet(&mut self) {
     for pending_pacekt in &mut self.pending_packets {
       if pending_pacekt.send_time.elapsed() > Self::resent_interval() {
+        println!("resend package {:?}", pending_pacekt.packet.seq);
         pending_pacekt.resend(&mut self.phy);
       }
     }
@@ -71,14 +73,17 @@ impl Simple {
     while let Ok(packet) = self.phy.recv() {
       let packet: MacPacket<DefaultPhy> = MacPacket::from_phy(&packet);
       if packet.dest != self.addr {
+        println!("Drop packet");
         continue;
       }
       if let Some(ack) = packet.reply_packet() {
         pending_ack.push_back(ack);
       }
+      println!("Receive packet {:?}", packet.seq);
       self.packets_received.send(packet).unwrap();
     }
     for packet in pending_ack {
+      println!("Send ack  for {:?}", packet.seq);
       self.phy.send(packet.into_phy()).unwrap();
     }
   }
@@ -109,3 +114,5 @@ impl MacStateMachine<DefaultPhy> for Simple {
     }
   }
 }
+
+mod test;
