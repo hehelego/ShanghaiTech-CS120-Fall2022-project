@@ -79,6 +79,13 @@ impl Simple {
       if let Some(ack) = packet.reply_packet() {
         pending_ack.push_back(ack);
       }
+      if packet.flags.ack {
+        if let Some(pending_packet) = self.pending_packets.front() {
+          if pending_packet.packet.seq == packet.seq {
+            self.pending_packets.pop_front();
+          }
+        }
+      }
       println!("Receive packet {:?}", packet.seq);
       self.packets_received.send(packet).unwrap();
     }

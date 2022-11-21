@@ -150,7 +150,6 @@ where
     if corr.into_f32() > Self::CORR_MIN && pwr.into_f32() > Self::POWER_MIN {
       self.corr_peak_value = corr;
       self.corr_peak_index = self.detect_window.tail_index;
-      println!("goto detect rise {}", self.corr_peak_index);
       FramingState::DetectRisingEdge
     } else {
       // Wait for preambles
@@ -167,7 +166,6 @@ where
       self.corr_peak_value = corr;
       self.corr_peak_index = self.detect_window.tail_index;
     } else if self.detect_window.tail_index - self.corr_peak_index > Self::AFTER_PEAK_SAMPLES {
-      println!("  into wait, corr: {:?}", self.corr_peak_value);
       self
         .frame_payload
         .extend(self.detect_window.extract_samples_to_end(self.corr_peak_index));
@@ -180,7 +178,6 @@ where
   fn wait_payload(&mut self, sample: FP) -> (FramingState, Option<FramePayload>) {
     // append the newly found sample into the payload window
     if let Some(payload) = self.frame_payload.update(sample) {
-      println!("  return to start, frame found");
       (FramingState::DetectPreambleStart, Some(payload))
     } else {
       (FramingState::WaitPayload, None)
