@@ -1,14 +1,10 @@
-pub fn add(left: usize, right: usize) -> usize {
-  left + right
-}
+/// IP packet, and TCP/UDP/ICMP packet inside the payload.
+mod packet;
 
-#[cfg(test)]
-mod tests {
-  use super::*;
+/// Athernet IP layer service provider and accessor
+mod aip_layer;
+pub use aip_layer::{IpAccessor, IpProvider};
 
-  #[test]
-  fn it_works() {
-    let result = add(2, 2);
-    assert_eq!(result, 4);
-  }
-}
+/// Transport layer socket API built on Athernet
+mod socket;
+pub use socket::{ASockProtocol, IcmpSocket, TcpSocket, UdpSocket};
