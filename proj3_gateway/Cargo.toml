@@ -10,3 +10,6 @@ clap = { version = "4.0", features = ["derive"] }
 rand = "0.8"
 pnet = "0.31"
 socket2 = { version = "0.4", features = ["all"] }
+serde = { version = "1.0", features = ["derive"] }
+proj2_multiple_access = { path = "../proj2_multiple_access" }
+crossbeam-channel = "0.5"
