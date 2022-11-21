@@ -1068,6 +1068,7 @@ dependencies = [
 name = "proj2_multiple_access"
 version = "0.1.0"
 dependencies = [
+ "crossbeam-channel",
  "proj1_acoustic_link",
  "rand",
 ]
