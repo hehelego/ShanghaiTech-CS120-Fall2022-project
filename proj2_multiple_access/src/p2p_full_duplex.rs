@@ -115,4 +115,5 @@ impl MacStateMachine<DefaultPhy> for Simple {
   }
 }
 
+#[cfg(test)]
 mod test;
