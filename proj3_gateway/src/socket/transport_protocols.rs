@@ -1,4 +1,7 @@
+use serde::{Deserialize, Serialize};
+
 /// Transport layer protocols for Athernet sockets
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ASockProtocol {
   UDP,
   ICMP,

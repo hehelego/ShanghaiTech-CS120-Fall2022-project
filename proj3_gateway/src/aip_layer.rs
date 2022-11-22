@@ -1,3 +1,5 @@
+mod ipc;
+
 mod provider;
 pub use provider::IpProvider;
 
