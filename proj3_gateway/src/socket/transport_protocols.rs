@@ -25,7 +25,7 @@ impl TryFrom<socket2::Protocol> for ASockProtocol {
       socket2::Protocol::ICMPV4 => Ok(ASockProtocol::ICMP),
       socket2::Protocol::UDP => Ok(ASockProtocol::UDP),
       socket2::Protocol::TCP => Ok(ASockProtocol::TCP),
-      _ => Err(std::io::Error::from(std::io::ErrorKind::Unsupported)),
+      _ => Err(std::io::ErrorKind::Unsupported.into()),
     }
   }
 }
