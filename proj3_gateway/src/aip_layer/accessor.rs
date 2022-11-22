@@ -1,5 +1,6 @@
 use crate::{
-  aip_layer::ipc::{extract_ip_pack, recv_packet, send_packet, Request, Response, IPC_TIMEOUT},
+  aip_layer::ipc::{extract_ip_pack, recv_packet, send_packet, Request, Response},
+  common::IPC_TIMEOUT,
   packet::{compose_icmp, compose_tcp, compose_udp, parse_icmp, parse_tcp, parse_udp},
   ASockProtocol, IpProvider,
 };

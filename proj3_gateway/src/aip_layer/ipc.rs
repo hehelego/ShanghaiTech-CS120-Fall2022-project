@@ -9,11 +9,8 @@ use std::{
   io::{ErrorKind, Result},
   mem,
   net::SocketAddrV4,
-  time::Duration,
 };
 
-/// IPC unix domain socket send/recv timeout
-pub const IPC_TIMEOUT: Duration = Duration::from_secs(1);
 /// Maximum packet size for IPC packet send over unix domain socket
 pub const IPC_PACK_SIZE: usize = 2048;
 
