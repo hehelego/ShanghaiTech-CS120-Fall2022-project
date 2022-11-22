@@ -59,8 +59,8 @@ impl From<WrapIpv4> for Ipv4 {
 impl From<Ipv4> for WrapIpv4 {
   fn from(ipv4: Ipv4) -> Self {
     let mut buf = vec![0; ipv4.total_length as usize];
-    let packet = MutableIpv4Packet::new(&mut buf).unwrap();
-    packet.populate(ipv4);
+    let mut packet = MutableIpv4Packet::new(&mut buf).unwrap();
+    packet.populate(&ipv4);
     Self(buf)
   }
 }

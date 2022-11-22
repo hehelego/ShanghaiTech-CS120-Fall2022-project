@@ -1,8 +1,8 @@
 use pnet::packet::{
-  icmp::*,
+  icmp::{checksum as icmp_checksum, *},
   ipv4::{checksum as ipv4_checksum, *},
-  tcp::*,
-  udp::*,
+  tcp::{ipv4_checksum as tcp_checksum, *},
+  udp::{ipv4_checksum as udp_checksum, *},
   FromPacket, Packet,
 };
 
@@ -38,6 +38,7 @@ pub(crate) fn compose_icmp(icmp: &Icmp, src: Ipv4Addr, dest: Ipv4Addr) -> Ipv4 {
   let mut buf = vec![0; icmp.payload.len() + 8];
   let mut icmp_pack = MutableIcmpPacket::new(&mut buf).unwrap();
   icmp_pack.populate(&icmp);
+  icmp_pack.set_checksum(icmp_checksum(&icmp_pack.to_immutable()));
   compose_ipv4(src, dest, icmp_pack.packet())
 }
 
@@ -47,6 +48,7 @@ pub(crate) fn compose_udp(udp: &Udp, src: Ipv4Addr, dest: Ipv4Addr) -> Ipv4 {
   let mut buf = vec![0; udp.payload.len() + 8];
   let mut udp_pack = MutableUdpPacket::new(&mut buf).unwrap();
   udp_pack.populate(&udp);
+  udp_pack.set_checksum(udp_checksum(&udp_pack.to_immutable(), &src, &dest));
   compose_ipv4(src, dest, udp_pack.packet())
 }
 
@@ -56,5 +58,6 @@ pub(crate) fn compose_tcp(tcp: &Tcp, src: Ipv4Addr, dest: Ipv4Addr) -> Ipv4 {
   let mut buf = vec![0; tcp.payload.len() + 8];
   let mut tcp_pack = MutableTcpPacket::new(&mut buf).unwrap();
   tcp_pack.populate(&tcp);
+  tcp_pack.set_checksum(tcp_checksum(&tcp_pack.to_immutable(), &src, &dest));
   compose_ipv4(src, dest, tcp_pack.packet())
 }
