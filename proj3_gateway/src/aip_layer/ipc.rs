@@ -1,4 +1,4 @@
-use crate::ASockProtocol;
+use crate::{common::IPC_PACK_SIZE, ASockProtocol};
 use pnet::packet::{
   ipv4::{Ipv4, Ipv4Packet, MutableIpv4Packet},
   FromPacket,
@@ -9,12 +9,7 @@ use std::{
   io::{ErrorKind, Result},
   mem,
   net::SocketAddrV4,
-  ops::Deref,
-  path::{Path, PathBuf},
 };
-
-/// Maximum packet size for IPC packet send over unix domain socket
-pub const IPC_PACK_SIZE: usize = 2048;
 
 pub(crate) fn send_packet<T: Serialize>(socket: &Socket, addr: &SockAddr, packet: &T) -> Result<()> {
   let packet = serde_json::to_vec(packet)?;
@@ -23,25 +18,12 @@ pub(crate) fn send_packet<T: Serialize>(socket: &Socket, addr: &SockAddr, packet
 }
 pub(crate) fn recv_packet<T: DeserializeOwned>(socket: &Socket) -> Result<T> {
   let mut recv_buf = vec![mem::MaybeUninit::zeroed(); IPC_PACK_SIZE];
-  let (n, from_addr) = socket.recv_from(&mut recv_buf)?;
+  let (n, _) = socket.recv_from(&mut recv_buf)?;
   let buf = recv_buf[..n]
     .iter()
     .map(|x| unsafe { mem::transmute(*x) })
     .collect::<Vec<u8>>();
   serde_json::from_slice(&buf).map_err(|_| ErrorKind::InvalidData.into())
-}
-pub(crate) fn recv_pack_addr<T: DeserializeOwned>(socket: &Socket) -> Result<(T, SockAddr)> {
-  let mut recv_buf = vec![mem::MaybeUninit::zeroed(); IPC_PACK_SIZE];
-  let (n, from_addr) = socket.recv_from(&mut recv_buf)?;
-  let buf = recv_buf[..n]
-    .iter()
-    .map(|x| unsafe { mem::transmute(*x) })
-    .collect::<Vec<u8>>();
-  if let Ok(pack) = serde_json::from_slice(&buf) {
-    Ok((pack, from_addr))
-  } else {
-    Err(ErrorKind::InvalidData.into())
-  }
 }
 
 pub(crate) fn extract_ip_pack(response: Response) -> Result<Ipv4> {

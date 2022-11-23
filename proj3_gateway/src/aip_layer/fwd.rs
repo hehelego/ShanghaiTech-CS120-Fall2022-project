@@ -55,7 +55,7 @@ impl IpLayerInternal {
         let addr = SocketAddrV4::new(ipv4.destination, udp.destination);
         self.udp_binds.get(&addr)
       }),
-      Ok(ASockProtocol::ICMP) => parse_icmp(&ipv4).and_then(|icmp| self.icmp_binds.get(&ipv4.destination)),
+      Ok(ASockProtocol::ICMP) => parse_icmp(&ipv4).and_then(|_| self.icmp_binds.get(&ipv4.destination)),
       Ok(ASockProtocol::TCP) => parse_tcp(&ipv4).and_then(|tcp| {
         let addr = SocketAddrV4::new(ipv4.destination, tcp.destination);
         self.tcp_binds.get(&addr)

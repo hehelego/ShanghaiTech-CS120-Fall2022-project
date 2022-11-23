@@ -1,6 +1,12 @@
 use socket2::SockAddr;
 use std::time::Duration;
 
+/// Maximum packet size for IPC packet send over unix domain socket
+pub const IPC_PACK_SIZE: usize = 4096;
+
+/// Maximum packet size for RAW socket IPv4 packet
+pub const RAWIP_PACK_SIZE: usize = 4096;
+
 /// timeout value for IPC unix domain socket send/recv
 pub const IPC_TIMEOUT: Duration = Duration::from_millis(10);
 
