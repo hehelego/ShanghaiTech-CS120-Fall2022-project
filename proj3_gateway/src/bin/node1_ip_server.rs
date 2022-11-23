@@ -3,6 +3,8 @@ use proj3_gateway::IpLayerInternal;
 use std::net::Ipv4Addr;
 
 fn main() {
+  env_logger::init();
+
   const SELF_MAC: MacAddr = MacAddr(1);
   const SELF_IP: Ipv4Addr = Ipv4Addr::new(192, 168, 1, 2);
   const PEER_MAC: MacAddr = MacAddr(2);
