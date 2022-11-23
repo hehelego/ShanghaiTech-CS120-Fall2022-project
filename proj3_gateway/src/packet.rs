@@ -25,25 +25,36 @@ pub(crate) fn parse_tcp(ipv4: &Ipv4) -> Option<Tcp> {
 pub(crate) fn compose_ipv4(src: Ipv4Addr, dest: Ipv4Addr, next_level: &[u8], protocol: ASockProtocol) -> Ipv4 {
   // 20 for IPv4 header with no extra options
   let mut buf = vec![0; next_level.len() + 20];
-  let ipv4 = Ipv4 {
-    version: 4,
-    header_length: 20,
-    dscp: 0,
-    ecn: 0,
-    total_length: 20 + next_level.len() as u16,
-    identification: rand::random(),
-    flags: 0x02, // do not fragment
-    fragment_offset: 0,
-    ttl: 255,
-    next_level_protocol: protocol.into(),
-    checksum: 0,
-    source: src,
-    destination: dest,
-    options: vec![],
-    payload: next_level.to_vec(),
-  };
+  // let ipv4 = Ipv4 {
+  //   version: 4,
+  //   header_length: 20,
+  //   dscp: 0,
+  //   ecn: 0,
+  //   total_length: 20 + next_level.len() as u16,
+  //   identification: rand::random(),
+  //   flags: 0x02, // do not fragment
+  //   fragment_offset: 0,
+  //   ttl: 64,
+  //   next_level_protocol: protocol.into(),
+  //   checksum: 0,
+  //   source: src,
+  //   destination: dest,
+  //   options: vec![],
+  //   payload: next_level.to_vec(),
+  // };
   let mut ip_pack = MutableIpv4Packet::new(&mut buf).unwrap();
-  ip_pack.populate(&ipv4);
+  ip_pack.set_version(4);
+  ip_pack.set_header_length(20);
+  ip_pack.set_dscp(0);
+  ip_pack.set_ecn(0);
+  ip_pack.set_total_length(20 + next_level.len() as u16);
+  ip_pack.set_identification(rand::random());
+  ip_pack.set_flags(0x02); // do not fragment
+  ip_pack.set_ttl(64);
+  ip_pack.set_next_level_protocol(protocol.into());
+  ip_pack.set_source(src);
+  ip_pack.set_destination(dest);
+  ip_pack.set_payload(next_level);
   ip_pack.set_checksum(ipv4_checksum(&ip_pack.to_immutable()));
   ip_pack.from_packet()
 }
