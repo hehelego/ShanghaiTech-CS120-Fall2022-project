@@ -205,7 +205,6 @@ impl IpLayerGateway {
 
   /// handle network traffic: Athernet -> other LAN
   fn handle_out(&mut self) {
-    self.ip_txrx.send_poll();
     let maybe_ipv4 = self.ip_txrx.recv_poll();
     // on receiving IPv4 packet from peer: forward it to internet
     if let Some(ipv4) = maybe_ipv4 {
@@ -219,6 +218,7 @@ impl IpLayerGateway {
   }
   /// handle network traffic: other LAN -> Athernet
   fn handle_in(&mut self) {
+    self.ip_txrx.send_poll();
     if let Ok(ipv4) = self.rawsock.recv() {
       log::debug!(
         "recv ipv4 from Internet-RAWSOCK {:?} -> {:?}, into forward I->A",
