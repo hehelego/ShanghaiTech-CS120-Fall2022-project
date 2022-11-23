@@ -8,30 +8,38 @@ use socket2::{SockAddr, Socket};
 use std::{
   io::{ErrorKind, Result},
   mem,
-  net::SocketAddrV4,
+  net::SocketAddrV4, path::PathBuf,
 };
 
 /// Maximum packet size for IPC packet send over unix domain socket
 pub const IPC_PACK_SIZE: usize = 2048;
 
-pub(crate) fn send_packet<T: Serialize>(socket: &Socket, addr: &SockAddr, packet: &T) -> std::io::Result<()> {
+pub(crate) fn send_packet<T: Serialize>(socket: &Socket, addr: &SockAddr, packet: &T) -> Result<()> {
   let packet = serde_json::to_vec(packet)?;
   socket.send_to(&packet, addr)?;
   Ok(())
 }
-pub(crate) fn recv_packet<T: DeserializeOwned>(socket: &Socket, addr: &SockAddr) -> std::io::Result<T> {
+pub(crate) fn recv_packet<T: DeserializeOwned>(socket: &Socket) -> Result<T> {
   let mut recv_buf = vec![mem::MaybeUninit::zeroed(); IPC_PACK_SIZE];
   let (n, from_addr) = socket.recv_from(&mut recv_buf)?;
-  unsafe {
-    if *addr.as_ptr() != *from_addr.as_ptr() {
-      return Err(ErrorKind::InvalidData.into());
-    }
-  }
   let buf = recv_buf[..n]
     .iter()
     .map(|x| unsafe { mem::transmute(*x) })
     .collect::<Vec<u8>>();
   serde_json::from_slice(&buf).map_err(|_| ErrorKind::InvalidData.into())
+}
+pub(crate) fn recv_pack_addr<T: DeserializeOwned>(socket: &Socket) -> Result<(T, SockAddr)> {
+  let mut recv_buf = vec![mem::MaybeUninit::zeroed(); IPC_PACK_SIZE];
+  let (n, from_addr) = socket.recv_from(&mut recv_buf)?;
+  let buf = recv_buf[..n]
+    .iter()
+    .map(|x| unsafe { mem::transmute(*x) })
+    .collect::<Vec<u8>>();
+  if let Ok(pack) = serde_json::from_slice(&buf) {
+    Ok((pack, from_addr))
+  } else {
+    Err(ErrorKind::InvalidData.into())
+  }
 }
 
 pub(crate) fn extract_ip_pack(response: Response) -> Result<Ipv4> {
@@ -66,8 +74,8 @@ impl From<Ipv4> for WrapIpv4 {
 /// Request to perform packet send or bind a socket
 #[derive(Serialize, Deserialize, Debug)]
 pub enum Request {
-  BindSocket(ASockProtocol, SocketAddrV4),
-  UnbindSocket,
+  BindSocket(PathBuf, ASockProtocol, SocketAddrV4),
+  UnbindSocket(PathBuf),
   SendPacket(WrapIpv4),
 }
 

@@ -5,9 +5,9 @@ use pnet::packet::{
   udp::{ipv4_checksum as udp_checksum, *},
   FromPacket, Packet,
 };
-use proj2_multiple_access::MacLayer;
+use proj2_multiple_access::{MacAddr, MacLayer};
 
-use std::net::Ipv4Addr;
+use std::{collections::VecDeque, net::Ipv4Addr};
 
 /// try to extract an ICMP packet from the payload of an IPv4 packet.
 pub(crate) fn parse_icmp(ipv4: &Ipv4) -> Option<Icmp> {
@@ -66,7 +66,7 @@ pub(crate) fn compose_tcp(tcp: &Tcp, src: Ipv4Addr, dest: Ipv4Addr) -> Ipv4 {
 /// fragments of an IP packet, can be send directly to peer via MAC layer
 pub(crate) struct IpPackFrag {
   data: Vec<u8>,
-  last: bool,
+  pub last: bool,
 }
 
 impl IpPackFrag {
@@ -90,7 +90,7 @@ impl IpPackFrag {
 }
 
 /// Split a IPv4 packet into chunks so that the packet can be send over MAC layer
-pub(crate) fn fragment_ipv4(ipv4: &Ipv4) -> Vec<IpPackFrag> {
+fn fragment_ipv4(ipv4: &Ipv4) -> Vec<IpPackFrag> {
   let mut buf = vec![0; ipv4.total_length as usize];
   let mut pack = MutableIpv4Packet::new(&mut buf).unwrap();
   pack.populate(&ipv4);
@@ -107,12 +107,58 @@ pub(crate) fn fragment_ipv4(ipv4: &Ipv4) -> Vec<IpPackFrag> {
   fragments
 }
 
-/// Reassemble chunks of a IPv4 packet into one ipv4 packet.
-pub(crate) fn reassemble_ipv4(fragments: Vec<IpPackFrag>) -> Ipv4 {
-  let mut buf = vec![];
-  for frag in fragments {
-    buf.extend(frag.data);
-  }
+/// Reassemble an IPv4 packet from bytes
+fn reassemble_ipv4(bytes: impl Iterator<Item = u8>) -> Ipv4 {
+  let buf: Vec<_> = bytes.collect();
   let packet = Ipv4Packet::new(&buf).unwrap();
+
   packet.from_packet()
+}
+
+/// A wrapper of MAC layer object: sending/receiving IP packets via MAC.
+/// - Split an IPv4 packet into multiple fragments and send them to peer
+/// - Reassemble an IPv4 packet from multiple received fragments
+pub(crate) struct IpOverMac {
+  mac: MacLayer,
+  self_addr: MacAddr,
+  peer_addr: MacAddr,
+  recv_frags: Vec<u8>,
+  send_frags: VecDeque<IpPackFrag>,
+}
+
+impl IpOverMac {
+  pub fn new(self_addr: MacAddr, peer_addr: MacAddr) -> Self {
+    Self {
+      mac: MacLayer::new_with_default_phy(self_addr),
+      self_addr,
+      peer_addr,
+      recv_frags: Default::default(),
+      send_frags: Default::default(),
+    }
+  }
+  /// schedule to send a packet
+  pub fn send(&mut self, ipv4: &Ipv4) {
+    self.send_frags.extend(fragment_ipv4(ipv4));
+  }
+  /// Called every iteration.
+  /// Send a fragment to peer
+  pub fn send_poll(&mut self) {
+    if let Some(frag) = self.send_frags.pop_front() {
+      self.mac.send_to(self.peer_addr, frag.into_mac_payload());
+    }
+  }
+  /// Called every iteration.
+  /// Try to receive a fragment then reassemble a IPv4 packet if it is possible
+  pub fn recv_poll(&mut self) -> Option<Ipv4> {
+    if let Some(frag) = self.mac.try_recv() {
+      let frag = IpPackFrag::from_mac_payload(&frag);
+      let last = frag.last;
+      self.recv_frags.extend(frag.data);
+      if last {
+        let ipv4 = reassemble_ipv4(self.recv_frags.drain(..));
+        return Some(ipv4);
+      }
+    }
+    None
+  }
 }

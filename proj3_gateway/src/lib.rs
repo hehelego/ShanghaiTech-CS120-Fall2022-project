@@ -3,7 +3,7 @@ mod packet;
 
 /// Athernet IP layer service provider and accessor
 mod aip_layer;
-pub use aip_layer::{IpAccessor, IpProvider};
+pub use aip_layer::{IpAccessor, IpLayerGateway, IpLayerInternal};
 
 /// Transport layer socket API built on Athernet
 mod socket;
