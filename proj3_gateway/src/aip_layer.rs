@@ -1,7 +1,10 @@
 mod ipc;
 
-mod provider;
-pub use provider::IpProvider;
-
 mod accessor;
 pub use accessor::IpAccessor;
+
+mod nat;
+pub use nat::IpLayerGateway;
+
+mod fwd;
+pub use fwd::IpLayerInternal;
