@@ -26,7 +26,10 @@ struct WrapRawSock {
 impl WrapRawSock {
   fn new() -> Result<Self> {
     // RAW IP packet socket creation
+    // Credit: https://stackoverflow.com/questions/33272644/raw-socket-unexpected-ip-header-added-when-sending-self-made-ip-tcp-packets
+    // see also `man protocol(5)`
     let rawsock = Socket::new(Domain::IPV4, Type::RAW, Some(Protocol::from(4)))?;
+    rawsock.set_header_included(false)?;
     rawsock.set_read_timeout(Some(RAWSOCK_TIMEOUT))?;
     rawsock.set_write_timeout(Some(RAWSOCK_TIMEOUT))?;
     rawsock.bind(&SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 0).into())?;
