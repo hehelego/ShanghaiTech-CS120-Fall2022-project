@@ -49,7 +49,8 @@ impl WrapRawSock {
     let dest = SocketAddrV4::new(ipv4.destination, 0);
     let mut pack = MutableIpv4Packet::new(&mut self.send_buf).ok_or(ErrorKind::InvalidData)?;
     pack.populate(&ipv4);
-    self.rawsock.send_to(pack.packet(), &dest.into())?;
+    let pack = &pack.packet()[..ipv4.total_length as usize];
+    self.rawsock.send_to(pack, &dest.into())?;
     Ok(())
   }
 }
