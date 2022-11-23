@@ -56,8 +56,8 @@ impl Worker {
       exit_tx,
     }
   }
-  fn recv_channel(&self) -> &Receiver<Ipv4> {
-    &self.pack_rx
+  fn recv(&self) -> Result<Ipv4> {
+    self.pack_rx.try_recv().map_err(|_| ErrorKind::InvalidData.into())
   }
 }
 impl Drop for Worker {
@@ -136,6 +136,10 @@ impl IpAccessor {
     *self.bind_addr.borrow_mut() = None;
     Ok(())
   }
+
+  fn recv_ipv4(&self) -> Result<Ipv4> {
+    self.worker.borrow().as_ref().expect("recv on unbind socket").recv()
+  }
 }
 
 impl Drop for IpAccessor {
@@ -156,8 +160,7 @@ impl IpAccessor {
   /// Receive an ICMP packet from the network layer.
   /// The ICMP representation packet and the source address are returned.
   pub fn recv_icmp(&self) -> Result<(Icmp, Ipv4Addr)> {
-    let resp: Response = recv_packet(&self.ipc)?;
-    let ipv4 = extract_ip_pack(resp)?;
+    let ipv4 = self.recv_ipv4()?;
     let icmp = parse_icmp(&ipv4).ok_or(ErrorKind::InvalidData)?;
     Ok((icmp, ipv4.source))
   }
@@ -175,8 +178,7 @@ impl IpAccessor {
   /// Receive a TCP packet from the network layer.
   /// The TCP representation packet and the source address are returned.
   pub fn recv_tcp(&self) -> Result<(Tcp, SocketAddrV4)> {
-    let resp: Response = recv_packet(&self.ipc)?;
-    let ipv4 = extract_ip_pack(resp)?;
+    let ipv4 = self.recv_ipv4()?;
     let tcp = parse_tcp(&ipv4).ok_or(ErrorKind::InvalidData)?;
     let src_addr = SocketAddrV4::new(ipv4.source, tcp.source);
     Ok((tcp, src_addr))
@@ -195,8 +197,7 @@ impl IpAccessor {
   /// Receive a UDP packet from the network layer.
   /// The TCP representation packet and the source address are returned.
   pub fn recv_udp(&self) -> Result<(Udp, SocketAddrV4)> {
-    let resp: Response = recv_packet(&self.ipc)?;
-    let ipv4 = extract_ip_pack(resp)?;
+    let ipv4 = self.recv_ipv4()?;
     let udp = parse_udp(&ipv4).ok_or(ErrorKind::InvalidData)?;
     let src_addr = SocketAddrV4::new(ipv4.source, udp.source);
     Ok((udp, src_addr))
