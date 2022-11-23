@@ -18,7 +18,7 @@ fn ipv4_once() {
   let dest = Ipv4Addr::new(0, 1, 2, 3);
 
   let data: Vec<_> = rng.sample_iter(Standard).take(len as usize).collect();
-  let ipv4 = compose_ipv4(src, dest, &data);
+  let ipv4 = compose_ipv4(src, dest, &data, crate::ASockProtocol::UDP);
   assert_eq!(data, ipv4.payload);
 }
 
