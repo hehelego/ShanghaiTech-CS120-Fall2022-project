@@ -65,28 +65,53 @@ pub(crate) fn compose_tcp(tcp: &Tcp, src: Ipv4Addr, dest: Ipv4Addr) -> Ipv4 {
 }
 
 /// fragments of an IP packet, can be send directly to peer via MAC layer
+///
+/// - [0..2]: (1 bit) last fragment flag + (15 bit) data length
+/// - [2..N]: data chunk
 pub(crate) struct IpPackFrag {
   data: Vec<u8>,
   pub last: bool,
 }
 
+fn combine_u16(high: u8, low: u8) -> u16 {
+  let low = low as u16;
+  let high = high as u16;
+
+  (high << 8) | low
+}
+fn decompose_u16(two_bytes: u16) -> (u8, u8) {
+  let low = two_bytes & 0b_0000_0000_1111_1111;
+  let high = (two_bytes >> 8) & 0b_0000_0000_1111_1111;
+  (high as u8, low as u8)
+}
+
 impl IpPackFrag {
-  /// maximum data size per fragment:
-  /// - [0..N-1]: data chunk
-  /// - [N-1]: is last fragment
-  const FRAG_SIZE: usize = MacLayer::MTU - 1;
+  /// maximum data size per fragment: 1 bytes for is last,
+  const FRAG_SIZE: usize = MacLayer::MTU - 2;
   /// parse a fragment from a MAC packet payload
   pub(crate) fn from_mac_payload(mac_payload: &[u8]) -> Self {
-    let (last, content) = mac_payload.split_last().unwrap();
-    let last = *last == 1;
-    let content = content.to_vec();
-    Self { data: content, last }
+    let (head, data) = mac_payload.split_at(2);
+
+    let head = combine_u16(head[0], head[1]);
+    let last = (head & 0b_1000_0000_0000_0000) != 0;
+    let len = (head & 0b_0111_1111_1111_1111) as usize;
+
+    let data = data[..len].to_vec();
+    Self { data, last }
   }
   /// populate a MAC packet payload with a fragment
   pub(crate) fn into_mac_payload(self) -> Vec<u8> {
-    let Self { mut data, last } = self;
-    data.push(last as u8);
-    data
+    let Self { data, last } = self;
+
+    let len = data.len();
+    let head = ((last as u16) << 15) | (len as u16);
+    let (head0, head1) = decompose_u16(head);
+
+    let mut buf = vec![0; len + 2];
+    buf[0] = head0;
+    buf[1] = head1;
+
+    buf
   }
 }
 
