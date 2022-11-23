@@ -1,7 +1,7 @@
 use crate::{
   aip_layer::ipc::{recv_packet, send_packet, IpcPath, Request, Response},
   common::{aip_ipc_sockaddr, AIP_SOCK, IPC_TIMEOUT},
-  packet::{parse_udp, IpOverMac},
+  packet::{parse_icmp, parse_tcp, parse_udp, IpOverMac},
   ASockProtocol,
 };
 use pnet::packet::ipv4::Ipv4;
@@ -41,65 +41,76 @@ pub struct IpLayerInternal {
 }
 
 impl IpLayerInternal {
+  /// called on receiving and IPv4 packet from peer IP layer:
+  /// forward the packet to a process for further handling
   fn on_recv_ipv4(&mut self, ipv4: Ipv4) {
     // some thing wrong, receiving a packet not for us
     if ipv4.destination != self.self_ip {
       return;
     }
 
+    // determine protocol, find the destination process
     match ipv4.next_level_protocol.try_into() {
-      Ok(ASockProtocol::UDP) => {
-        parse_udp(&ipv4)
-          .and_then(|udp| {
-            let addr = SocketAddrV4::new(ipv4.destination, udp.destination);
-            self.udp_binds.get(&addr)
-          })
-          .and_then(|ipc_path| {
-            let pack = Response::ReceivedPacket(ipv4.into());
-            let _ = send_packet(&self.ipc, &ipc_path.as_sockaddr(), &pack);
-            Some(())
-          });
-      }
-      Ok(ASockProtocol::ICMP) => todo!(),
-      Ok(ASockProtocol::TCP) => todo!(),
-      _ => todo!(),
-    };
+      Ok(ASockProtocol::UDP) => parse_udp(&ipv4).and_then(|udp| {
+        let addr = SocketAddrV4::new(ipv4.destination, udp.destination);
+        self.udp_binds.get(&addr)
+      }),
+      Ok(ASockProtocol::ICMP) => parse_icmp(&ipv4).and_then(|icmp| self.icmp_binds.get(&ipv4.destination)),
+      Ok(ASockProtocol::TCP) => parse_tcp(&ipv4).and_then(|tcp| {
+        let addr = SocketAddrV4::new(ipv4.destination, tcp.destination);
+        self.tcp_binds.get(&addr)
+      }),
+      _ => None,
+    }
+    // forward the IPv4 packet to that process for further handling
+    .and_then(|ipc_path| {
+      let pack = Response::ReceivedPacket(ipv4.into());
+      let _ = send_packet(&self.ipc, &ipc_path.as_sockaddr(), &pack);
+      Some(())
+    });
   }
+  /// called on bind socket failed: response with error message
   fn on_bind_failed(&self, ipc_path: IpcPath) {
+    // TODO: error message
     let pack = Response::BindResult(false);
     let _ = send_packet(&self.ipc, &ipc_path.as_sockaddr(), &pack);
   }
+  /// called on a process request to bind a socket:
+  /// try to add the (socket address <-> IPC socket) mapping.
+  /// send back response.
   fn handle_bind(&mut self, protocol: ASockProtocol, addr: SocketAddrV4, ipc_path: IpcPath) {
-    if *addr.ip() != self.self_ip {
+    if *addr.ip() != self.self_ip || self.socks_in_use.contains_key(&ipc_path) {
       self.on_bind_failed(ipc_path);
       return;
     }
-    match protocol {
-      ASockProtocol::UDP => {
-        if self.socks_in_use.get(&ipc_path).is_some() {
-          self.on_bind_failed(ipc_path);
-        } else {
-          self.socks_in_use.insert(ipc_path.clone(), (protocol, addr));
-          self.udp_binds.insert(addr, ipc_path.clone());
-          let pack = Response::BindResult(true);
-          let _ = send_packet(&self.ipc, &ipc_path.as_sockaddr(), &pack);
-        }
-      }
-      ASockProtocol::ICMP => todo!(),
-      ASockProtocol::TCP => todo!(),
-    }
+    let pack = Response::BindResult(true);
+    self.socks_in_use.insert(ipc_path.clone(), (protocol, addr));
+    let _ = send_packet(&self.ipc, &ipc_path.as_sockaddr(), &pack);
+
+    let _ = match protocol {
+      ASockProtocol::UDP => self.udp_binds.insert(addr, ipc_path),
+      ASockProtocol::ICMP => self.icmp_binds.insert(*addr.ip(), ipc_path),
+      ASockProtocol::TCP => self.tcp_binds.insert(addr, ipc_path),
+    };
   }
+  /// called on a process request to bind a socket:
+  /// try to remove the (socket address <-> IPC socket) mapping.
   fn handle_unbind(&mut self, ipc_path: IpcPath) {
-    if let Some((_, addr)) = self.socks_in_use.remove(&ipc_path) {
-      self.udp_binds.remove(&addr);
+    if let Some((protocol, addr)) = self.socks_in_use.remove(&ipc_path) {
+      let _ = match protocol {
+        ASockProtocol::UDP => self.udp_binds.remove(&addr),
+        ASockProtocol::ICMP => self.icmp_binds.remove(addr.ip()),
+        ASockProtocol::TCP => self.tcp_binds.remove(&addr),
+      };
     }
   }
+  /// called on a process request to send a IPv4 packet to peer:
+  /// send over mac
   fn handle_send(&mut self, ipv4: Ipv4) {
     self.ip_txrx.send(&ipv4);
   }
 
   fn mainloop(&mut self) {
-    // MAC ip txrx
     self.ip_txrx.send_poll();
     let maybe_ipv4 = self.ip_txrx.recv_poll();
     // on receiving IPv4 packet from peer
@@ -108,7 +119,6 @@ impl IpLayerInternal {
     }
 
     // handling requests: bind socket & send packet
-    // recv_packet(&self.ipc, None);
     if let Ok(request) = recv_packet::<Request>(&self.ipc) {
       match request {
         Request::BindSocket(ipc_path, protocol, addr) => self.handle_bind(protocol, addr, ipc_path),
