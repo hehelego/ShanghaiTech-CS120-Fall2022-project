@@ -231,7 +231,7 @@ impl IpLayerGateway {
   /// Run as a gateway node: NAT
   pub fn run(&mut self) {
     loop {
-      log::info!("gateway nat mainloop iteration");
+      log::trace!("gateway nat mainloop iteration");
       self.handle_in();
       self.handle_out();
     }

@@ -138,7 +138,7 @@ impl IpLayerInternal {
   /// Run as a internal node: forward IP packets to gateway
   pub fn run(&mut self) {
     loop {
-      log::info!("internal forward mainloop iteration");
+      log::trace!("internal forward mainloop iteration");
       self.mainloop()
     }
   }
