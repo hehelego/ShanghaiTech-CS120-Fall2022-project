@@ -11,10 +11,11 @@ use std::{
   cell::RefCell,
   io::{ErrorKind, Result},
   net::{Ipv4Addr, SocketAddrV4},
-  path::PathBuf,
   sync::Arc,
   thread::{spawn, JoinHandle},
 };
+
+use super::ipc::IpcPath;
 
 struct Worker {
   handler: Option<JoinHandle<()>>,
@@ -73,7 +74,7 @@ impl Drop for Worker {
 /// An [`IpAccessor`] should be associated with a unique Athernet socket object.
 pub struct IpAccessor {
   ipc: Arc<Socket>,
-  ipc_path: PathBuf,
+  ipc_path: IpcPath,
   worker: RefCell<Option<Worker>>,
   bind_addr: RefCell<Option<Ipv4Addr>>,
 }
@@ -91,7 +92,7 @@ impl IpAccessor {
     ipc.bind(&SockAddr::unix(sock_path)?)?;
     Ok(Self {
       ipc: Arc::new(ipc),
-      ipc_path: PathBuf::from(sock_path),
+      ipc_path: IpcPath::new(sock_path),
       worker: RefCell::new(None),
       bind_addr: RefCell::new(None),
     })

@@ -1,6 +1,6 @@
 use crate::{
   common::{aip_ipc_sockaddr, AIP_SOCK, IPC_TIMEOUT},
-  packet::IpOverMac,
+  packet::{parse_udp, IpOverMac},
   ASockProtocol,
 };
 use pnet::packet::ipv4::Ipv4;
@@ -13,7 +13,7 @@ use std::{
   path::Path,
 };
 
-use super::ipc::{recv_pack_addr, recv_packet, Request, Response};
+use super::ipc::{recv_packet, send_packet, IpcPath, Request, Response, WrapIpv4};
 
 /// A unix-domain socket server which provides IP layer service:
 /// send IP packets to peer or receive IP packets from peer
@@ -36,33 +36,56 @@ pub struct IpLayerInternal {
   // IPC
   ipc: Socket,
   // socket in use: sock-addr <-> IPC socket
-  socket_in_use: HashMap<String, (ASockProtocol, SocketAddrV4)>,
-  icmp_socks: HashMap<Ipv4Addr, Socket>,
-  tcp_socks: HashMap<SocketAddrV4, Socket>,
-  udp_socks: HashMap<SocketAddrV4, Socket>,
+  socks_in_use: HashMap<IpcPath, (ASockProtocol, SocketAddrV4)>,
+  icmp_binds: HashMap<Ipv4Addr, IpcPath>,
+  tcp_binds: HashMap<SocketAddrV4, IpcPath>,
+  udp_binds: HashMap<SocketAddrV4, IpcPath>,
 }
 
 impl IpLayerInternal {
-  fn on_recv_ipv4(&mut self, ipv4: &Ipv4) {
+  fn on_recv_ipv4(&mut self, ipv4: Ipv4) {
     match ipv4.next_level_protocol.try_into() {
-      Ok(ASockProtocol::UDP) => todo!(),
+      Ok(ASockProtocol::UDP) => {
+        parse_udp(&ipv4)
+          .and_then(|udp| {
+            let addr = SocketAddrV4::new(ipv4.destination, udp.destination);
+            self.udp_binds.get(&addr)
+          })
+          .and_then(|ipc_path| {
+            let pack = Response::ReceivedPacket(ipv4.into());
+            let _ = send_packet(&self.ipc, &ipc_path.as_sockaddr(), &pack);
+            Some(())
+          });
+      }
       Ok(ASockProtocol::ICMP) => todo!(),
       Ok(ASockProtocol::TCP) => todo!(),
       _ => todo!(),
     };
   }
-  fn handle_bind(&mut self, protocol: ASockProtocol, addr: SocketAddrV4, ipc_path: &Path) {
+  fn handle_bind(&mut self, protocol: ASockProtocol, addr: SocketAddrV4, ipc_path: IpcPath) {
     match protocol {
-      ASockProtocol::UDP => todo!(),
+      ASockProtocol::UDP => {
+        if self.socks_in_use.get(&ipc_path).is_some() {
+          let pack = Response::BindResult(false);
+          let _ = send_packet(&self.ipc, &ipc_path.as_sockaddr(), &pack);
+        } else {
+          self.socks_in_use.insert(ipc_path.clone(), (protocol, addr));
+          self.udp_binds.insert(addr, ipc_path.clone());
+          let pack = Response::BindResult(true);
+          let _ = send_packet(&self.ipc, &ipc_path.as_sockaddr(), &pack);
+        }
+      }
       ASockProtocol::ICMP => todo!(),
       ASockProtocol::TCP => todo!(),
     }
   }
-  fn handle_unbind(&mut self, ipc_path: &Path) {
-    todo!()
+  fn handle_unbind(&mut self, ipc_path: IpcPath) {
+    if let Some((_, addr)) = self.socks_in_use.remove(&ipc_path) {
+      self.udp_binds.remove(&addr);
+    }
   }
-  fn handle_send(&mut self, ipv4: &Ipv4) {
-    todo!()
+  fn handle_send(&mut self, ipv4: Ipv4) {
+    self.ip_txrx.send(&ipv4);
   }
 
   fn mainloop(&mut self) {
@@ -71,16 +94,16 @@ impl IpLayerInternal {
     let maybe_ipv4 = self.ip_txrx.recv_poll();
     // on receiving IPv4 packet from peer
     if let Some(ipv4) = maybe_ipv4 {
-      self.on_recv_ipv4(&ipv4);
+      self.on_recv_ipv4(ipv4);
     }
 
     // handling requests: bind socket & send packet
     // recv_packet(&self.ipc, None);
-    if let Ok((request, from)) = recv_pack_addr::<Request>(&self.ipc) {
+    if let Ok(request) = recv_packet::<Request>(&self.ipc) {
       match request {
-        Request::BindSocket(ipc_path, protocol, addr) => self.handle_bind(protocol, addr, &ipc_path),
-        Request::UnbindSocket(ipc_path) => self.handle_unbind(&ipc_path),
-        Request::SendPacket(ipv4) => self.handle_send(&ipv4.into()),
+        Request::BindSocket(ipc_path, protocol, addr) => self.handle_bind(protocol, addr, ipc_path),
+        Request::UnbindSocket(ipc_path) => self.handle_unbind(ipc_path),
+        Request::SendPacket(ipv4) => self.handle_send(ipv4.into()),
       }
     }
   }
@@ -110,10 +133,10 @@ impl IpLayerInternal {
       peer_ip: peer_addr.1,
       ip_txrx: IpOverMac::new(self_addr.0, peer_addr.0),
       ipc,
-      socket_in_use: Default::default(),
-      icmp_socks: Default::default(),
-      tcp_socks: Default::default(),
-      udp_socks: Default::default(),
+      socks_in_use: Default::default(),
+      icmp_binds: Default::default(),
+      tcp_binds: Default::default(),
+      udp_binds: Default::default(),
     })
   }
 }

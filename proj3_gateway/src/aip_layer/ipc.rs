@@ -8,7 +8,9 @@ use socket2::{SockAddr, Socket};
 use std::{
   io::{ErrorKind, Result},
   mem,
-  net::SocketAddrV4, path::PathBuf,
+  net::SocketAddrV4,
+  ops::Deref,
+  path::{Path, PathBuf},
 };
 
 /// Maximum packet size for IPC packet send over unix domain socket
@@ -70,12 +72,24 @@ impl From<Ipv4> for WrapIpv4 {
   }
 }
 
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, Hash)]
+pub struct IpcPath(String);
+
+impl IpcPath {
+  pub fn new(path: &str) -> Self {
+    Self(path.to_owned())
+  }
+  pub fn as_sockaddr(&self) -> SockAddr {
+    SockAddr::unix(&self.0).unwrap()
+  }
+}
+
 /// Accessor -> Provider IPC packet protocol.
 /// Request to perform packet send or bind a socket
 #[derive(Serialize, Deserialize, Debug)]
 pub enum Request {
-  BindSocket(PathBuf, ASockProtocol, SocketAddrV4),
-  UnbindSocket(PathBuf),
+  BindSocket(IpcPath, ASockProtocol, SocketAddrV4),
+  UnbindSocket(IpcPath),
   SendPacket(WrapIpv4),
 }
 
