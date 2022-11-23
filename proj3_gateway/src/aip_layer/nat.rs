@@ -9,7 +9,7 @@ use pnet::packet::{
 };
 use proj2_multiple_access::MacAddr;
 use rand::{rngs::ThreadRng, thread_rng, Rng};
-use socket2::{Domain, Socket, Type};
+use socket2::{Domain, Protocol, Socket, Type};
 use std::{
   collections::HashMap,
   io::{ErrorKind, Result},
@@ -26,7 +26,7 @@ struct WrapRawSock {
 impl WrapRawSock {
   fn new() -> Result<Self> {
     // RAW IP packet socket creation
-    let rawsock = Socket::new(Domain::IPV4, Type::RAW, None)?;
+    let rawsock = Socket::new(Domain::IPV4, Type::RAW, Some(Protocol::from(4)))?;
     rawsock.set_read_timeout(Some(RAWSOCK_TIMEOUT))?;
     rawsock.set_write_timeout(Some(RAWSOCK_TIMEOUT))?;
     rawsock.bind(&SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 0).into())?;
@@ -175,7 +175,7 @@ impl IpLayerGateway {
             // UDP NAT: change dest port
             let ipv4 = compose_udp(&udp, ipv4.source, self.peer_ip);
             // compose function should recompute checksum
-            let _ = self.rawsock.send(ipv4);
+            self.ip_txrx.send(&ipv4);
           }
 
           Some(())
