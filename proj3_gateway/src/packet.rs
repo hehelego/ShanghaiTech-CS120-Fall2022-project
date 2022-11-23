@@ -3,7 +3,7 @@ use pnet::packet::{
   ipv4::{checksum as ipv4_checksum, *},
   tcp::{ipv4_checksum as tcp_checksum, *},
   udp::{ipv4_checksum as udp_checksum, *},
-  FromPacket, MutablePacket, Packet,
+  FromPacket, Packet,
 };
 use proj2_multiple_access::{MacAddr, MacLayer};
 
