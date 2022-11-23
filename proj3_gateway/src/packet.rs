@@ -9,6 +9,8 @@ use proj2_multiple_access::{MacAddr, MacLayer};
 
 use std::{collections::VecDeque, net::Ipv4Addr};
 
+use crate::ASockProtocol;
+
 /// try to extract an ICMP packet from the payload of an IPv4 packet.
 pub(crate) fn parse_icmp(ipv4: &Ipv4) -> Option<Icmp> {
   IcmpPacket::new(&ipv4.payload).map(|packet| packet.from_packet())
@@ -22,10 +24,11 @@ pub(crate) fn parse_tcp(ipv4: &Ipv4) -> Option<Tcp> {
   TcpPacket::new(&ipv4.payload).map(|packet| packet.from_packet())
 }
 
-pub(crate) fn compose_ipv4(src: Ipv4Addr, dest: Ipv4Addr, next_level: &[u8]) -> Ipv4 {
+pub(crate) fn compose_ipv4(src: Ipv4Addr, dest: Ipv4Addr, next_level: &[u8], protocol: ASockProtocol) -> Ipv4 {
   // 20 for IPv4 header with no extra options
   let mut buf = vec![0; next_level.len() + 20];
   let mut ip_pack = MutableIpv4Packet::new(&mut buf).unwrap();
+  ip_pack.set_next_level_protocol(protocol.into());
   ip_pack.set_total_length(20 + next_level.len() as u16);
   ip_pack.set_source(src);
   ip_pack.set_destination(dest);
@@ -41,7 +44,7 @@ pub(crate) fn compose_icmp(icmp: &Icmp, src: Ipv4Addr, dest: Ipv4Addr) -> Ipv4 {
   let mut icmp_pack = MutableIcmpPacket::new(&mut buf).unwrap();
   icmp_pack.populate(&icmp);
   icmp_pack.set_checksum(icmp_checksum(&icmp_pack.to_immutable()));
-  compose_ipv4(src, dest, icmp_pack.packet())
+  compose_ipv4(src, dest, icmp_pack.packet(), ASockProtocol::ICMP)
 }
 
 /// compose an IPv4 packet which encapsulates an UDP packet
@@ -51,7 +54,7 @@ pub(crate) fn compose_udp(udp: &Udp, src: Ipv4Addr, dest: Ipv4Addr) -> Ipv4 {
   let mut udp_pack = MutableUdpPacket::new(&mut buf).unwrap();
   udp_pack.populate(&udp);
   udp_pack.set_checksum(udp_checksum(&udp_pack.to_immutable(), &src, &dest));
-  compose_ipv4(src, dest, udp_pack.packet())
+  compose_ipv4(src, dest, udp_pack.packet(), ASockProtocol::UDP)
 }
 
 /// compose an IPv4 packet which encapsulates an TCP packet
@@ -61,7 +64,7 @@ pub(crate) fn compose_tcp(tcp: &Tcp, src: Ipv4Addr, dest: Ipv4Addr) -> Ipv4 {
   let mut tcp_pack = MutableTcpPacket::new(&mut buf).unwrap();
   tcp_pack.populate(&tcp);
   tcp_pack.set_checksum(tcp_checksum(&tcp_pack.to_immutable(), &src, &dest));
-  compose_ipv4(src, dest, tcp_pack.packet())
+  compose_ipv4(src, dest, tcp_pack.packet(), ASockProtocol::TCP)
 }
 
 /// fragments of an IP packet, can be send directly to peer via MAC layer
@@ -110,7 +113,7 @@ impl IpPackFrag {
     let mut buf = vec![0; len + 2];
     buf[0] = head0;
     buf[1] = head1;
-    buf[2..len].copy_from_slice(&data);
+    buf[2..].copy_from_slice(&data);
 
     buf
   }
