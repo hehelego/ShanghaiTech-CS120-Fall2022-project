@@ -139,24 +139,38 @@ impl IpOverMac {
   }
   /// schedule to send a packet
   pub fn send(&mut self, ipv4: &Ipv4) {
+    log::debug!("send ipv4 via MAC: {:?} -> {:?}", ipv4.source, ipv4.destination);
     self.send_frags.extend(fragment_ipv4(ipv4));
   }
   /// Called every iteration.
   /// Send a fragment to peer
   pub fn send_poll(&mut self) {
+    log::trace!("try to send a fragment via MAC");
     if let Some(frag) = self.send_frags.pop_front() {
+      log::trace!(
+        "have a fragment to send via MAC: len={}, last={}",
+        frag.data.len(),
+        frag.last
+      );
       self.mac.send_to(self.peer_addr, frag.into_mac_payload());
     }
   }
   /// Called every iteration.
   /// Try to receive a fragment then reassemble a IPv4 packet if it is possible
   pub fn recv_poll(&mut self) -> Option<Ipv4> {
+    log::trace!("try to receive a fragment from MAC");
     if let Some(frag) = self.mac.try_recv() {
       let frag = IpPackFrag::from_mac_payload(&frag);
+      log::trace!(
+        "have a fragment to received from MAC: len={}, last={}",
+        frag.data.len(),
+        frag.last
+      );
       let last = frag.last;
       self.recv_frags.extend(frag.data);
       if last {
         let ipv4 = reassemble_ipv4(self.recv_frags.drain(..));
+        log::debug!("receive ipv4 via MAC: {:?} -> {:?}", ipv4.source, ipv4.destination);
         return Some(ipv4);
       }
     }
