@@ -406,18 +406,8 @@ version = "0.13.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a01d95850c592940db9b8194bc39f4bc0e89dee5c4265e4b1807c34a9aba453c"
 dependencies = [
- "darling_core 0.13.4",
- "darling_macro 0.13.4",
-]
-
-[[package]]
-name = "darling"
-version = "0.14.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b0dd3cd20dc6b5a876612a6e5accfe7f3dd883db6d07acfbf14c128f61550dfa"
-dependencies = [
- "darling_core 0.14.2",
- "darling_macro 0.14.2",
+ "darling_core",
+ "darling_macro",
 ]
 
 [[package]]
@@ -435,60 +425,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "darling_core"
-version = "0.14.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a784d2ccaf7c98501746bf0be29b2022ba41fd62a2e622af997a03e9f972859f"
-dependencies = [
- "fnv",
- "ident_case",
- "proc-macro2 1.0.47",
- "quote 1.0.21",
- "strsim",
- "syn 1.0.103",
-]
-
-[[package]]
 name = "darling_macro"
 version = "0.13.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9c972679f83bdf9c42bd905396b6c3588a843a17f0f16dfcfa3e2c5d57441835"
 dependencies = [
- "darling_core 0.13.4",
- "quote 1.0.21",
- "syn 1.0.103",
-]
-
-[[package]]
-name = "darling_macro"
-version = "0.14.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7618812407e9402654622dd402b0a89dff9ba93badd6540781526117b92aab7e"
-dependencies = [
- "darling_core 0.14.2",
- "quote 1.0.21",
- "syn 1.0.103",
-]
-
-[[package]]
-name = "deku"
-version = "0.15.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "28a6ebcd26e59dcd590e8869c751eccccfd89047bf20048966d1de823e442a7b"
-dependencies = [
- "bitvec",
- "deku_derive",
-]
-
-[[package]]
-name = "deku_derive"
-version = "0.15.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d77061e73fa9f78497426c53d62e28a6d64949a53f53bbd4d946ade2c9ede86f"
-dependencies = [
- "darling 0.14.2",
- "proc-macro-crate",
- "proc-macro2 1.0.47",
+ "darling_core",
  "quote 1.0.21",
  "syn 1.0.103",
 ]
@@ -523,6 +465,19 @@ dependencies = [
  "libc",
  "quote 0.6.13",
  "syn 0.15.44",
+]
+
+[[package]]
+name = "env_logger"
+version = "0.9.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a12e6657c4c97ebab115a42dcee77225f7f482cdd841cf7088c657a42e9e00e7"
+dependencies = [
+ "atty",
+ "humantime",
+ "log",
+ "regex",
+ "termcolor",
 ]
 
 [[package]]
@@ -604,6 +559,12 @@ name = "hound"
 version = "3.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4d13cdbd5dbb29f9c88095bbdc2590c9cba0d0a1269b983fef6b2cdd7e9f4db1"
+
+[[package]]
+name = "humantime"
+version = "2.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9a3a5bfb195931eeb336b2a7b4d761daec841b97f947d34394601737a7bba5e4"
 
 [[package]]
 name = "ident_case"
@@ -867,7 +828,7 @@ version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0df7ac00c4672f9d5aece54ee3347520b7e20f158656c7db2e6de01902eb7a6c"
 dependencies = [
- "darling 0.13.4",
+ "darling",
  "proc-macro-crate",
  "proc-macro2 1.0.47",
  "quote 1.0.21",
@@ -1266,7 +1227,8 @@ version = "0.1.0"
 dependencies = [
  "clap 4.0.26",
  "crossbeam-channel",
- "deku",
+ "env_logger",
+ "log",
  "pnet",
  "proj2_multiple_access",
  "rand",
