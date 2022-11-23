@@ -11,3 +11,6 @@ pub use socket::{ASockProtocol, IcmpSocket, TcpSocket, UdpSocket};
 
 /// Define common constant values: timeout length, maximum packet size ...
 mod common;
+
+#[cfg(test)]
+mod tests;
