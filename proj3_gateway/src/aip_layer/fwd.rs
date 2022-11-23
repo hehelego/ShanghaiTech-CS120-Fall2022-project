@@ -79,13 +79,16 @@ impl IpLayerInternal {
   /// try to add the (socket address <-> IPC socket) mapping.
   /// send back response.
   fn handle_bind(&mut self, protocol: ASockProtocol, addr: SocketAddrV4, ipc_path: IpcPath) {
+    log::debug!("handle bind request {:?}@{:?} from {:?}", protocol, addr, ipc_path);
     if *addr.ip() != self.self_ip || self.socks_in_use.contains_key(&ipc_path) {
+      log::debug!("bind failed: not local address");
       self.on_bind_failed(ipc_path);
       return;
     }
     let pack = Response::BindResult(true);
     self.socks_in_use.insert(ipc_path.clone(), (protocol, addr));
     let _ = send_packet(&self.ipc, &ipc_path.as_sockaddr(), &pack);
+    log::debug!("bind success");
 
     let _ = match protocol {
       ASockProtocol::UDP => self.udp_binds.insert(addr, ipc_path),
@@ -96,7 +99,9 @@ impl IpLayerInternal {
   /// called on a process request to bind a socket:
   /// try to remove the (socket address <-> IPC socket) mapping.
   fn handle_unbind(&mut self, ipc_path: IpcPath) {
+    log::debug!("handle unbind request from {:?}", ipc_path);
     if let Some((protocol, addr)) = self.socks_in_use.remove(&ipc_path) {
+      log::debug!("unbind {:?}@{:?}", protocol, addr);
       let _ = match protocol {
         ASockProtocol::UDP => self.udp_binds.remove(&addr),
         ASockProtocol::ICMP => self.icmp_binds.remove(addr.ip()),
@@ -107,6 +112,7 @@ impl IpLayerInternal {
   /// called on a process request to send a IPv4 packet to peer:
   /// send over mac
   fn handle_send(&mut self, ipv4: Ipv4) {
+    log::debug!("handle send Ipv4 {:?} -> {:?}", ipv4.source, ipv4.destination);
     self.ip_txrx.send(&ipv4);
   }
 
@@ -115,6 +121,7 @@ impl IpLayerInternal {
     let maybe_ipv4 = self.ip_txrx.recv_poll();
     // on receiving IPv4 packet from peer
     if let Some(ipv4) = maybe_ipv4 {
+      log::debug!("recv ipv4 from {:?} -> {:?}", ipv4.source, ipv4.destination);
       self.on_recv_ipv4(ipv4);
     }
 
@@ -131,6 +138,7 @@ impl IpLayerInternal {
   /// Run as a internal node: forward IP packets to gateway
   pub fn run(&mut self) {
     loop {
+      log::info!("internal forward mainloop iteration");
       self.mainloop()
     }
   }
@@ -141,6 +149,12 @@ impl IpLayerInternal {
   /// - `self_addr`: the MAC address and IP address of current node
   /// - `peer_addr`: the MAC address and IP address of peer node
   pub fn new(self_addr: (MacAddr, Ipv4Addr), peer_addr: (MacAddr, Ipv4Addr)) -> Result<Self> {
+    log::debug!(
+      "starting IP layer for internal@{:?}, gateway@{:?}",
+      self_addr,
+      peer_addr
+    );
+
     // IPC unix domain socket
     let _ = std::fs::remove_file(AIP_SOCK);
     let ipc = Socket::new(Domain::UNIX, Type::DGRAM, None)?;

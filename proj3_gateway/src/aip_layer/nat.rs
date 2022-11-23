@@ -5,7 +5,7 @@ use crate::{
 };
 use pnet::packet::{
   ipv4::{Ipv4, Ipv4Packet, MutableIpv4Packet},
-  FromPacket, MutablePacket, Packet,
+  FromPacket, Packet,
 };
 use proj2_multiple_access::MacAddr;
 use rand::{rngs::ThreadRng, thread_rng, Rng};
@@ -141,6 +141,7 @@ pub struct IpLayerGateway {
 impl IpLayerGateway {
   /// forward a IPv4 packet to other LAN
   fn forward_out(&mut self, ipv4: Ipv4) {
+    log::debug!("Athernet -> Internet: {:?} -> {:?}", ipv4.source, ipv4.destination);
     match ipv4.next_level_protocol.try_into() {
       Ok(ASockProtocol::UDP) => {
         parse_udp(&ipv4).and_then(|mut udp| {
@@ -156,6 +157,8 @@ impl IpLayerGateway {
           // compose function should recompute checksum
           let _ = self.rawsock.send(ipv4);
 
+          log::debug!("forward A->I UDP, inet_port={}", inet_port);
+
           Some(())
         });
       }
@@ -166,6 +169,7 @@ impl IpLayerGateway {
   }
   /// forward a IPv4 packet into Athernet
   fn forward_in(&mut self, ipv4: Ipv4) {
+    log::debug!("Internet -> Athernet: {:?} -> {:?}", ipv4.source, ipv4.destination);
     match ipv4.next_level_protocol.try_into() {
       Ok(ASockProtocol::UDP) => {
         parse_udp(&ipv4).and_then(|mut udp| {
@@ -176,6 +180,8 @@ impl IpLayerGateway {
             let ipv4 = compose_udp(&udp, ipv4.source, self.peer_ip);
             // compose function should recompute checksum
             self.ip_txrx.send(&ipv4);
+
+            log::debug!("forward I->A UDP, anet_port={}", anet_port);
           }
 
           Some(())
@@ -203,18 +209,29 @@ impl IpLayerGateway {
     let maybe_ipv4 = self.ip_txrx.recv_poll();
     // on receiving IPv4 packet from peer: forward it to internet
     if let Some(ipv4) = maybe_ipv4 {
+      log::debug!(
+        "recv ipv4 from Athernet-MAC {:?} -> {:?}, into forward A->I",
+        ipv4.source,
+        ipv4.destination
+      );
       self.forward_out(ipv4);
     }
   }
   /// handle network traffic: other LAN -> Athernet
   fn handle_in(&mut self) {
     if let Ok(ipv4) = self.rawsock.recv() {
+      log::debug!(
+        "recv ipv4 from Internet-RAWSOCK {:?} -> {:?}, into forward I->A",
+        ipv4.source,
+        ipv4.destination
+      );
       self.forward_in(ipv4);
     }
   }
   /// Run as a gateway node: NAT
   pub fn run(&mut self) {
     loop {
+      log::info!("gateway nat mainloop iteration");
       self.handle_in();
       self.handle_out();
     }
@@ -226,6 +243,12 @@ impl IpLayerGateway {
   /// - `self_addr`: the MAC address and IP address of current node
   /// - `peer_addr`: the MAC address and IP address of peer node
   pub fn new(self_addr: (MacAddr, Ipv4Addr), peer_addr: (MacAddr, Ipv4Addr)) -> Result<Self> {
+    log::debug!(
+      "starting IP layer for gateway@{:?}, internal@{:?}",
+      self_addr,
+      peer_addr
+    );
+
     Ok(Self {
       self_ip: self_addr.1,
       peer_ip: peer_addr.1,
