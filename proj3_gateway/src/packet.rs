@@ -110,6 +110,7 @@ impl IpPackFrag {
     let mut buf = vec![0; len + 2];
     buf[0] = head0;
     buf[1] = head1;
+    buf[2..len].copy_from_slice(&data);
 
     buf
   }
