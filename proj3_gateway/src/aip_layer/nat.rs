@@ -180,9 +180,9 @@ fn icmp_can_pass(icmp: &Icmp) -> bool {
   if icmp.icmp_type == IcmpTypes::EchoReply {
     true
   } else if icmp.icmp_type == IcmpTypes::EchoRequest {
-    let l0 = icmp.payload.len();
-    let l1 = NAT_ICMP_BYPASS_PATTERN.len();
-    &icmp.payload[..l0 - l1] == NAT_ICMP_BYPASS_PATTERN
+    let payload_len = icmp.payload.len();
+    let suffix_len = NAT_ICMP_BYPASS_PATTERN.len();
+    &icmp.payload[payload_len - suffix_len..] == NAT_ICMP_BYPASS_PATTERN
   } else {
     false
   }
