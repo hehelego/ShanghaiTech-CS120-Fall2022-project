@@ -78,7 +78,7 @@ impl WrapRawSock {
     let dest = SocketAddrV4::new(ipv4.destination, 0);
     let mut pack = MutableIpv4Packet::new(&mut self.send_buf[..len]).ok_or(ErrorKind::InvalidData)?;
     pack.populate(&ipv4);
-    sock.send_to(&pack.packet(), &dest.into())?;
+    sock.send_to(pack.packet(), &dest.into())?;
 
     Ok(())
   }
@@ -100,11 +100,11 @@ impl NatTable {
   }
   /// table lookup: Athernet port -> Internet port
   fn find_a2i(&self, anet_port: u16) -> Option<u16> {
-    self.anet2inet.get(&anet_port).and_then(|x| Some(*x))
+    self.anet2inet.get(&anet_port).copied()
   }
   /// table lookup: Internet port -> Athernet port
   fn find_i2a(&self, inet_port: u16) -> Option<u16> {
-    self.inet2anet.get(&inet_port).and_then(|x| Some(*x))
+    self.inet2anet.get(&inet_port).copied()
   }
   /// find a already existing mapping or add a new random mapping: A -> I
   fn find_or_add(&mut self, anet_port: u16) -> u16 {
@@ -115,7 +115,7 @@ impl NatTable {
     // find an unused Internet port number
     let inet_port = rand::thread_rng()
       .sample_iter(rand::distributions::Standard)
-      .find(|port| !self.inet2anet.contains_key(&port))
+      .find(|port| !self.inet2anet.contains_key(port))
       .unwrap();
     self.anet2inet.insert(anet_port, inet_port);
     self.inet2anet.insert(inet_port, anet_port);
@@ -212,7 +212,7 @@ impl IpLayerGateway {
     log::debug!("Athernet -> Internet: {:?} -> {:?}", ipv4.source, ipv4.destination);
     match ipv4.next_level_protocol.try_into() {
       Ok(ASockProtocol::UDP) => {
-        parse_udp(&ipv4).and_then(|mut udp| {
+        if let Some(mut udp) = parse_udp(&ipv4) {
           // UDP NAT: change source port
           let inet_port = self.nat.find_or_add(udp.source);
           udp.source = inet_port;
@@ -222,22 +222,20 @@ impl IpLayerGateway {
           let _ = self.rawsock.send(ipv4);
 
           log::debug!("forward A->I UDP, inet_port={}", inet_port);
-          Some(())
-        });
+        }
       }
       Ok(ASockProtocol::ICMP) => {
-        parse_icmp(&ipv4).and_then(|icmp| {
+        if let Some(icmp) = parse_icmp(&ipv4) {
           // ICMP NAT: change source address
           let ipv4 = compose_icmp(&icmp, self.inet_self_ip, ipv4.destination);
           // compose function should recompute checksum
           let _ = self.rawsock.send(ipv4);
 
           log::debug!("forward A->I ICMP");
-          Some(())
-        });
+        }
       }
       Ok(ASockProtocol::TCP) => {
-        parse_udp(&ipv4).and_then(|mut tcp| {
+        if let Some(mut tcp) = parse_udp(&ipv4) {
           // TCP NAT: change source port
           let inet_port = self.nat.find_or_add(tcp.source);
           tcp.source = inet_port;
@@ -247,8 +245,7 @@ impl IpLayerGateway {
           let _ = self.rawsock.send(ipv4);
 
           log::debug!("forward A->I TCP, inet_port={}", inet_port);
-          Some(())
-        });
+        }
       }
       Err(_) => {
         log::debug!("forward A->I UNKNOWN, discard packet");
@@ -260,7 +257,7 @@ impl IpLayerGateway {
     log::debug!("Internet -> Athernet: {:?} -> {:?}", ipv4.source, ipv4.destination);
     match ipv4.next_level_protocol.try_into() {
       Ok(ASockProtocol::UDP) => {
-        parse_udp(&ipv4).and_then(|mut udp| {
+        if let Some(mut udp) = parse_udp(&ipv4) {
           if let Some(anet_port) = self.nat.find_i2a(udp.destination) {
             // UDP NAT: change dest port
             udp.destination = anet_port;
@@ -272,32 +269,23 @@ impl IpLayerGateway {
 
             log::debug!("forward I->A UDP, anet_port={}", anet_port);
           }
-
-          Some(())
-        });
+        }
       }
       Ok(ASockProtocol::ICMP) => {
-        parse_icmp(&ipv4)
-          .and_then(|icmp| {
-            if icmp_can_pass(&icmp) {
-              Some(icmp)
-            } else {
-              log::debug!("forward I->A ICMP cannot pass NAT, discard");
-              None
-            }
-          })
-          .and_then(|icmp| {
-            // ICMP NAT: change dest address
-            let ipv4 = compose_icmp(&icmp, ipv4.source, self.anet_peer_ip);
-            // compose function should recompute checksum
-            // send to peer via MAC
-            self.ip_txrx.send(&ipv4);
-
-            Some(())
-          });
+        if let Some(icmp) = parse_icmp(&ipv4) {
+          if !icmp_can_pass(&icmp) {
+            log::debug!("forward I->A ICMP cannot pass NAT, discard");
+            return;
+          }
+          // ICMP NAT: change dest address
+          let ipv4 = compose_icmp(&icmp, ipv4.source, self.anet_peer_ip);
+          // compose function should recompute checksum
+          // send to peer via MAC
+          self.ip_txrx.send(&ipv4);
+        }
       }
       Ok(ASockProtocol::TCP) => {
-        parse_tcp(&ipv4).and_then(|mut tcp| {
+        if let Some(mut tcp) = parse_tcp(&ipv4) {
           if let Some(anet_port) = self.nat.find_i2a(tcp.destination) {
             // UDP NAT: change dest port
             tcp.destination = anet_port;
@@ -309,14 +297,11 @@ impl IpLayerGateway {
 
             log::debug!("forward I->A TCP, anet_port={}", anet_port);
           }
-
-          Some(())
-        });
+        }
       }
       Err(_) => {
         // other transport protocol, ignored
         log::debug!("forward I->A UNKNOWN, discard packet");
-        return;
       }
     }
   }

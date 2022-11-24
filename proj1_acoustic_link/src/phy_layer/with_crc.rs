@@ -39,10 +39,10 @@ impl CrcPhy {
   }
   fn crc_remove(packet: PhyPacket) -> Option<PhyPacket> {
     let (data, checksum) = packet.split_at(Self::PACKET_BYTES);
-    let crc = Self::CRC16.checksum(&data);
+    let crc = Self::CRC16.checksum(data);
     let cs_low = (crc & 0x00FF) as u8;
     let cs_high = (crc & 0xFF00) as u8;
-    if checksum == &[cs_low, cs_high] {
+    if checksum == [cs_low, cs_high] {
       Some(PhyPacket::from(data))
     } else {
       None

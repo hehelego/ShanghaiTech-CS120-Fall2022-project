@@ -47,9 +47,6 @@ impl PreambleGen for ChirpUpDown {
   fn iter(&self) -> std::slice::Iter<FP> {
     self.samples.iter()
   }
-  fn len(&self) -> usize {
-    self.samples.len()
-  }
   fn norm(&self) -> FP {
     self.norm
   }

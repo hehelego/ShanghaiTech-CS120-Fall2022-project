@@ -80,36 +80,32 @@ impl IpLayerInternal {
     }
 
     // determine protocol, find the destination process
-    match ipv4.next_level_protocol.try_into() {
-      Ok(ASockProtocol::UDP) => parse_udp(&ipv4).and_then(|udp| {
+    if let Ok(Some(bind_ipc)) = ipv4.next_level_protocol.try_into().map(|protocol| match protocol {
+      ASockProtocol::UDP => parse_udp(&ipv4).and_then(|udp| {
         let addr = SocketAddrV4::new(ipv4.destination, udp.destination);
         let bind_ipc = self.udp_binds.get(&addr);
         log::debug!("forward to {:?} for UDP@{:?}", bind_ipc, addr);
         bind_ipc
       }),
-      Ok(ASockProtocol::ICMP) => parse_icmp(&ipv4).and_then(|_icmp| {
+      ASockProtocol::ICMP => parse_icmp(&ipv4).and_then(|_icmp| {
         let addr = ipv4.destination;
         let bind_ipc = self.icmp_binds.get(&addr);
         log::debug!("forward to {:?} for ICMP@{:?}", bind_ipc, addr);
         bind_ipc
       }),
-      Ok(ASockProtocol::TCP) => parse_tcp(&ipv4).and_then(|tcp| {
+      ASockProtocol::TCP => parse_tcp(&ipv4).and_then(|tcp| {
         let addr = SocketAddrV4::new(ipv4.destination, tcp.destination);
         let bind_ipc = self.tcp_binds.get(&addr);
         log::debug!("forward to {:?} for TCP@{:?}", bind_ipc, addr);
         bind_ipc
       }),
-      Err(_) => {
-        log::debug!("unkonwn protocol, discard the packet");
-        None
-      }
-    }
-    // forward the IPv4 packet to that process for further handling
-    .and_then(|bind_ipc| {
+    }) {
+      // forward the IPv4 packet to that process for further handling
       let pack = Response::ReceivedPacket(ipv4.into());
       let _ = send_packet(&self.ipc, &bind_ipc.as_sockaddr(), &pack);
-      Some(())
-    });
+    } else {
+      log::debug!("unkonwn protocol, discard the packet");
+    }
   }
   /// called on bind socket failed: response with error message
   fn on_bind_failed(&self, ipc_path: IpcPath) {

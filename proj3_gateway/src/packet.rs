@@ -53,7 +53,7 @@ pub(crate) fn compose_icmp(icmp: &Icmp, src: Ipv4Addr, dest: Ipv4Addr) -> Ipv4 {
   // 8: ICMP header.
   let mut buf = vec![0; icmp.payload.len() + 8];
   let mut icmp_pack = MutableIcmpPacket::new(&mut buf).unwrap();
-  icmp_pack.populate(&icmp);
+  icmp_pack.populate(icmp);
   icmp_pack.set_checksum(icmp_checksum(&icmp_pack.to_immutable()));
   compose_ipv4(src, dest, icmp_pack.packet(), ASockProtocol::ICMP)
 }
@@ -63,7 +63,7 @@ pub(crate) fn compose_udp(udp: &Udp, src: Ipv4Addr, dest: Ipv4Addr) -> Ipv4 {
   // 8: UDP header.
   let mut buf = vec![0; udp.payload.len() + 8];
   let mut udp_pack = MutableUdpPacket::new(&mut buf).unwrap();
-  udp_pack.populate(&udp);
+  udp_pack.populate(udp);
   udp_pack.set_checksum(udp_checksum(&udp_pack.to_immutable(), &src, &dest));
   compose_ipv4(src, dest, udp_pack.packet(), ASockProtocol::UDP)
 }
@@ -73,7 +73,7 @@ pub(crate) fn compose_tcp(tcp: &Tcp, src: Ipv4Addr, dest: Ipv4Addr) -> Ipv4 {
   // 20: TCP header, with no extra options. 4 bit per option.
   let mut buf = vec![0; 20 + tcp.payload.len() + 4 * tcp.data_offset as usize];
   let mut tcp_pack = MutableTcpPacket::new(&mut buf).unwrap();
-  tcp_pack.populate(&tcp);
+  tcp_pack.populate(tcp);
   tcp_pack.set_checksum(tcp_checksum(&tcp_pack.to_immutable(), &src, &dest));
   compose_ipv4(src, dest, tcp_pack.packet(), ASockProtocol::TCP)
 }
@@ -134,7 +134,7 @@ impl IpPackFrag {
 fn fragment_ipv4(ipv4: &Ipv4) -> Vec<IpPackFrag> {
   let mut buf = vec![0; ipv4.total_length as usize];
   let mut pack = MutableIpv4Packet::new(&mut buf).unwrap();
-  pack.populate(&ipv4);
+  pack.populate(ipv4);
 
   let mut fragments: Vec<_> = buf
     .chunks(IpPackFrag::FRAG_SIZE)

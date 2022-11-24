@@ -141,7 +141,7 @@ where
   fn detect_preamble_start(&mut self, sample: FP) -> FramingState {
     self.detect_window.update(sample);
     // Not enough samples
-    if self.detect_window.len() < self.preamble_gen.len() || !self.detect_window.enough_power() {
+    if self.detect_window.len() < PG::PREAMBLE_LEN || !self.detect_window.enough_power() {
       return FramingState::DetectPreambleStart;
     }
     // To check if is the beginning of the preamble
@@ -188,8 +188,10 @@ where
   // Calculate the relations between preamble and samples. Return the ratio of correlation power to the received signal average power and cosine similarity.
   fn corr(&self) -> FP {
     let r = self.detect_window.len();
-    let pl = self.preamble_gen.len();
-    dot_product(self.detect_window.buffer.range(r - pl..r), self.preamble_gen.iter())
+    dot_product(
+      self.detect_window.buffer.range(r - PG::PREAMBLE_LEN..),
+      self.preamble_gen.iter(),
+    )
   }
 
   // reset the fields relatated to preable detection.

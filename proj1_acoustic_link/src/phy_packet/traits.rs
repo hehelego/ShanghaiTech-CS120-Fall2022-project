@@ -15,7 +15,6 @@ pub trait PreambleGen {
   /// generate the preamble samples, should contain exactly [`Self::PREAMBLE_LEN`] samples.
   fn samples(&self) -> FramePreamble;
   fn norm(&self) -> FP;
-  fn len(&self) -> usize;
   fn generate() -> Self;
   fn iter(&self) -> std::slice::Iter<FP>;
 }
