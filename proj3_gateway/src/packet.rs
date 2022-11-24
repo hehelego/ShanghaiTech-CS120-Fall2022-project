@@ -27,7 +27,7 @@ pub(crate) fn compose_ipv4(src: Ipv4Addr, dest: Ipv4Addr, next_level: &[u8], pro
   let mut buf = vec![0; next_level.len() + 20];
   let ipv4 = Ipv4 {
     version: 4,
-    header_length: 20,
+    header_length: 5,
     dscp: 0,
     ecn: 0,
     total_length: 20 + next_level.len() as u16,
