@@ -24,7 +24,7 @@ impl UdpSocket {
     let udp_packet = Udp {
       source: self.addr.port(),
       destination: addr.port(),
-      length: bytes_written as u16,
+      length: 8 + bytes_written as u16,
       checksum: 0,
       payload: buf[..bytes_written].to_vec(),
     };

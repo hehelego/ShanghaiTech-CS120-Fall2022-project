@@ -29,7 +29,7 @@ fn udp_once() {
   let udp = Udp {
     source: rng.gen(),
     destination: rng.gen(),
-    length: len,
+    length: len + 8,
     checksum: 0,
     payload: rng.sample_iter(Standard).take(len as usize).collect(),
   };
