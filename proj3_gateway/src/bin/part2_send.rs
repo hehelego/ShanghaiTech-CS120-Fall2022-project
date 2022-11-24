@@ -1,5 +1,5 @@
-use std::net::{Ipv4Addr, SocketAddrV4};
 use proj3_gateway::UdpSocket;
+use std::net::{Ipv4Addr, SocketAddrV4};
 
 fn main() {
   env_logger::init();

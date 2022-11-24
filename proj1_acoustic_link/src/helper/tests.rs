@@ -68,7 +68,7 @@ fn fbfb() {
 }
 
 #[test]
-fn nrzi(){
+fn nrzi() {
   for _ in 0..TESTS {
     let bytes: Vec<u8> = rand::thread_rng().sample_iter(Standard).take(1).collect();
     let bits = bytes.view_bits();
