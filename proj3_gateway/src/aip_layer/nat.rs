@@ -164,7 +164,7 @@ impl NatTable {
 ///        5. send via MAC
 pub struct IpLayerGateway {
   // L2/L3 address
-  _anet_self_ip: Ipv4Addr,
+  anet_self_ip: Ipv4Addr,
   anet_peer_ip: Ipv4Addr,
   // send/recv IPv4 packets via MAC
   ip_txrx: IpOverMac,
@@ -187,7 +187,25 @@ fn icmp_can_pass(icmp: &Icmp) -> bool {
   }
 }
 
+/// The destination of a packet send to gateway is
+/// - either targeting a node within Athernet,
+/// - or a node in the Internet.
+enum DestNet {
+  Athernet,
+  Internet,
+}
+
 impl IpLayerGateway {
+  /// determine whether we should forward the packet to Internet via NAT
+  /// or route the packet in Athernet LAN
+  fn pack_dest_net(&self, ipv4: &Ipv4) -> DestNet {
+    if [self.anet_self_ip, self.anet_peer_ip].contains(&ipv4.destination) {
+      DestNet::Athernet
+    } else {
+      DestNet::Internet
+    }
+  }
+
   /// forward a IPv4 packet to other LAN
   fn forward_out(&mut self, ipv4: Ipv4) {
     log::debug!("Athernet -> Internet: {:?} -> {:?}", ipv4.source, ipv4.destination);
@@ -304,15 +322,23 @@ impl IpLayerGateway {
 
   /// handle network traffic: Athernet -> other LAN
   fn handle_out(&mut self) {
+    // try to receive IPv4 packet in Athernet
     let maybe_ipv4 = self.ip_txrx.recv_poll();
     // on receiving IPv4 packet from peer: forward it to Internet
     if let Some(ipv4) = maybe_ipv4 {
-      log::debug!(
-        "recv ipv4 from Athernet-MAC {:?} -> {:?}, into forward A->I",
-        ipv4.source,
-        ipv4.destination
-      );
-      self.forward_out(ipv4);
+      match self.pack_dest_net(&ipv4) {
+        DestNet::Athernet => {
+          self.ip_txrx.send(&ipv4);
+        }
+        DestNet::Internet => {
+          log::debug!(
+            "recv ipv4 from Athernet-MAC {:?} -> {:?}, into forward A->I",
+            ipv4.source,
+            ipv4.destination
+          );
+          self.forward_out(ipv4);
+        }
+      }
     }
   }
   /// handle network traffic: other LAN -> Athernet
@@ -350,7 +376,7 @@ impl IpLayerGateway {
     );
 
     Ok(Self {
-      _anet_self_ip: self_addr.1,
+      anet_self_ip: self_addr.1,
       anet_peer_ip: peer_addr.1,
       ip_txrx: IpOverMac::new(self_addr.0, peer_addr.0),
       rawsock: WrapRawSock::new(inet_addr)?,
