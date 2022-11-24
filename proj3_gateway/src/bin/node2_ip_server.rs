@@ -8,12 +8,16 @@ use clap::Parser;
 #[derive(Parser)]
 struct NatCli {
   /// Athernet IP address of gateway node
+  #[arg(long, default_value_t = Ipv4Addr::new(192, 168, 1, 1))]
   gateway_ip: Ipv4Addr,
   /// Athernet MAC address of gateway node
+  #[arg(long, default_value_t = 1)]
   gateway_mac: u8,
   /// Athernet IP address of internal node
+  #[arg(long, default_value_t = Ipv4Addr::new(192, 168, 1, 2))]
   internal_ip: Ipv4Addr,
   /// Athernet MAC address of internal node
+  #[arg(long, default_value_t = 2)]
   internal_mac: u8,
 
   /// Internet IP address of the gateway/NAT
