@@ -61,7 +61,8 @@ impl WrapRawSock {
       ipv4_pack.from_packet()
     };
     assert_eq!(ipv4.destination, self.inet_addr);
-    let protocol: ASockProtocol = ipv4.next_level_protocol.try_into()?;
+    let protocol: Result<ASockProtocol> = ipv4.next_level_protocol.try_into();
+    assert!(protocol.is_ok());
     Ok(ipv4)
   }
   fn send(&mut self, ipv4: Ipv4) -> Result<()> {
