@@ -5,8 +5,6 @@ use std::{
   net::UdpSocket,
 };
 
-use rand::{self, RngCore};
-
 #[derive(Parser)]
 struct Cli {
   /// The host port

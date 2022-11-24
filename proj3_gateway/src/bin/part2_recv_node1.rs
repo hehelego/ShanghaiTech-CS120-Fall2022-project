@@ -3,7 +3,7 @@ use proj3_gateway::UdpSocket;
 use std::{
   fs::File,
   io::Write,
-  net::{Ipv4Addr, SocketAddr, SocketAddrV4},
+  net::{Ipv4Addr, SocketAddrV4},
 };
 
 #[derive(Parser)]
