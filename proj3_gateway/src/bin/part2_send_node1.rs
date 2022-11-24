@@ -13,12 +13,15 @@ struct Cli {
 }
 
 fn main() {
-  env_logger::init();
   let Cli { src_port, dest_addr } = Cli::parse();
+  // Initialize socket.
   let self_addr: SocketAddrV4 = SocketAddrV4::new(Ipv4Addr::new(192, 168, 1, 2), src_port);
   let upd_socket = UdpSocket::bind(self_addr).unwrap();
+
+  // Read data
   let data_lines = BufReader::new(File::open("INPUT.txt").unwrap()).lines();
   let mut lines_count = 0;
+
   println!("Starting send data to {dest_addr}");
   for line in data_lines {
     if let Ok(data) = line {
@@ -28,6 +31,7 @@ fn main() {
       lines_count += 1;
     }
   }
+  // Send two blank line to end the transmission
   upd_socket.send_to("".as_bytes(), dest_addr).unwrap();
   upd_socket.send_to("".as_bytes(), dest_addr).unwrap();
   println!("Send finished. {lines_count} lines in total");
