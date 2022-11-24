@@ -1,14 +1,15 @@
 use crate::{
-  common::{RAWIP_PACK_SIZE, RAWSOCK_TIMEOUT},
+  common::{NAT_ICMP_BYPASS_PATTERN, RAWIP_PACK_SIZE, RAWSOCK_TIMEOUT},
   packet::{compose_icmp, compose_tcp, compose_udp, parse_icmp, parse_tcp, parse_udp, IpOverMac},
   ASockProtocol,
 };
 use pnet::packet::{
+  icmp::{Icmp, IcmpTypes},
   ipv4::{Ipv4, Ipv4Packet, MutableIpv4Packet},
   FromPacket, Packet,
 };
 use proj2_multiple_access::MacAddr;
-use rand::{rngs::ThreadRng, thread_rng, Rng};
+use rand::Rng;
 use socket2::{Domain, Socket, Type};
 use std::{
   collections::HashMap,
@@ -61,7 +62,6 @@ impl WrapRawSock {
     };
     assert_eq!(ipv4.destination, self.inet_addr);
     let protocol: ASockProtocol = ipv4.next_level_protocol.try_into()?;
-    log::info!("get a {:?} packet from raw socket", protocol);
     Ok(ipv4)
   }
   fn send(&mut self, ipv4: Ipv4) -> Result<()> {
@@ -97,23 +97,34 @@ impl NatTable {
       inet2anet: Default::default(),
     }
   }
-  fn anet_to_inet(&self, anet_port: u16) -> Option<u16> {
+  /// table lookup: Athernet port -> Internet port
+  fn find_a2i(&self, anet_port: u16) -> Option<u16> {
     self.anet2inet.get(&anet_port).and_then(|x| Some(*x))
   }
-  fn inet_to_anet(&self, inet_port: u16) -> Option<u16> {
+  /// table lookup: Internet port -> Athernet port
+  fn find_i2a(&self, inet_port: u16) -> Option<u16> {
     self.inet2anet.get(&inet_port).and_then(|x| Some(*x))
   }
-  fn add(&mut self, anet_port: u16, inet_port: u16) -> bool {
-    if self.anet2inet.contains_key(&anet_port) || self.inet2anet.contains_key(&inet_port) {
-      false
-    } else {
-      self.anet2inet.insert(anet_port, inet_port);
-      self.inet2anet.insert(inet_port, anet_port);
-      true
+  /// find a already existing mapping or add a new random mapping: A -> I
+  fn find_or_add(&mut self, anet_port: u16) -> u16 {
+    // already have a mapping
+    if let Some(inet_port) = self.find_a2i(anet_port) {
+      return inet_port;
     }
+    // find an unused Internet port number
+    let inet_port = rand::thread_rng()
+      .sample_iter(rand::distributions::Standard)
+      .find(|port| !self.inet2anet.contains_key(&port))
+      .unwrap();
+    self.anet2inet.insert(anet_port, inet_port);
+    self.inet2anet.insert(inet_port, anet_port);
+
+    inet_port
   }
+  /// remove a NAT port mapping
+  /// TODO: remove a mapping if no packet send/recv in the last minute.
   fn remove(&mut self, anet_port: u16, inet_port: u16) -> bool {
-    if self.anet_to_inet(anet_port) != Some(inet_port) || self.inet_to_anet(inet_port) != Some(anet_port) {
+    if self.find_a2i(anet_port) != Some(inet_port) || self.find_i2a(inet_port) != Some(anet_port) {
       false
     } else {
       self.anet2inet.remove(&anet_port);
@@ -153,19 +164,27 @@ impl NatTable {
 ///        5. send via MAC
 pub struct IpLayerGateway {
   // L2/L3 address
-  anet_self_ip: Ipv4Addr,
+  _anet_self_ip: Ipv4Addr,
   anet_peer_ip: Ipv4Addr,
   // send/recv IPv4 packets via MAC
   ip_txrx: IpOverMac,
   // raw socket for send/recv IPv4 packets: in Internet instead of Athernet
   rawsock: WrapRawSock,
   inet_self_ip: Ipv4Addr,
-  // NAT table:
-  udp_nat: NatTable,
-  tcp_nat: NatTable,
-  icmp_nat: NatTable,
-  // random number generator
-  rng: ThreadRng,
+  // NAT table: Internet port <-> Athernet port
+  nat: NatTable,
+}
+
+fn icmp_can_pass(icmp: &Icmp) -> bool {
+  if icmp.icmp_type == IcmpTypes::EchoReply {
+    true
+  } else if icmp.icmp_type == IcmpTypes::EchoRequest {
+    let l0 = icmp.payload.len();
+    let l1 = NAT_ICMP_BYPASS_PATTERN.len();
+    &icmp.payload[..l0 - l1] == NAT_ICMP_BYPASS_PATTERN
+  } else {
+    false
+  }
 }
 
 impl IpLayerGateway {
@@ -175,12 +194,8 @@ impl IpLayerGateway {
     match ipv4.next_level_protocol.try_into() {
       Ok(ASockProtocol::UDP) => {
         parse_udp(&ipv4).and_then(|mut udp| {
-          // already have a mapping
-          while self.udp_nat.anet_to_inet(udp.source).is_none() {
-            self.udp_nat.add(udp.source, self.rng.gen());
-          }
           // UDP NAT: change source port
-          let inet_port = self.udp_nat.anet_to_inet(udp.source).unwrap();
+          let inet_port = self.nat.find_or_add(udp.source);
           udp.source = inet_port;
           // UDP NAT: change source address
           let ipv4 = compose_udp(&udp, self.inet_self_ip, ipv4.destination);
@@ -188,13 +203,37 @@ impl IpLayerGateway {
           let _ = self.rawsock.send(ipv4);
 
           log::debug!("forward A->I UDP, inet_port={}", inet_port);
-
           Some(())
         });
       }
-      Ok(ASockProtocol::ICMP) => todo!(),
-      Ok(ASockProtocol::TCP) => todo!(),
-      Err(_) => todo!(),
+      Ok(ASockProtocol::ICMP) => {
+        parse_icmp(&ipv4).and_then(|icmp| {
+          // ICMP NAT: change source address
+          let ipv4 = compose_icmp(&icmp, self.inet_self_ip, ipv4.destination);
+          // compose function should recompute checksum
+          let _ = self.rawsock.send(ipv4);
+
+          log::debug!("forward A->I ICMP");
+          Some(())
+        });
+      }
+      Ok(ASockProtocol::TCP) => {
+        parse_udp(&ipv4).and_then(|mut tcp| {
+          // TCP NAT: change source port
+          let inet_port = self.nat.find_or_add(tcp.source);
+          tcp.source = inet_port;
+          // TCP NAT: change source address
+          let ipv4 = compose_udp(&tcp, self.inet_self_ip, ipv4.destination);
+          // compose function should recompute checksum
+          let _ = self.rawsock.send(ipv4);
+
+          log::debug!("forward A->I TCP, inet_port={}", inet_port);
+          Some(())
+        });
+      }
+      Err(_) => {
+        log::debug!("forward A->I UNKNOWN, discard packet");
+      }
     }
   }
   /// forward a IPv4 packet into Athernet
@@ -203,12 +242,13 @@ impl IpLayerGateway {
     match ipv4.next_level_protocol.try_into() {
       Ok(ASockProtocol::UDP) => {
         parse_udp(&ipv4).and_then(|mut udp| {
-          if let Some(anet_port) = self.udp_nat.inet_to_anet(udp.destination) {
+          if let Some(anet_port) = self.nat.find_i2a(udp.destination) {
             // UDP NAT: change dest port
             udp.destination = anet_port;
             // UDP NAT: change dest address
             let ipv4 = compose_udp(&udp, ipv4.source, self.anet_peer_ip);
             // compose function should recompute checksum
+            // send to peer via MAC
             self.ip_txrx.send(&ipv4);
 
             log::debug!("forward I->A UDP, anet_port={}", anet_port);
@@ -218,16 +258,45 @@ impl IpLayerGateway {
         });
       }
       Ok(ASockProtocol::ICMP) => {
-        // TODO: NAT in for ICMP
-        return;
+        parse_icmp(&ipv4)
+          .and_then(|icmp| {
+            if icmp_can_pass(&icmp) {
+              Some(icmp)
+            } else {
+              log::debug!("forward I->A ICMP cannot pass NAT, discard");
+              None
+            }
+          })
+          .and_then(|icmp| {
+            // ICMP NAT: change dest address
+            let ipv4 = compose_icmp(&icmp, ipv4.source, self.anet_peer_ip);
+            // compose function should recompute checksum
+            // send to peer via MAC
+            self.ip_txrx.send(&ipv4);
+
+            Some(())
+          });
       }
       Ok(ASockProtocol::TCP) => {
-        // TODO: NAT in for TCP
-        return;
+        parse_tcp(&ipv4).and_then(|mut tcp| {
+          if let Some(anet_port) = self.nat.find_i2a(tcp.destination) {
+            // UDP NAT: change dest port
+            tcp.destination = anet_port;
+            // UDP NAT: change dest address
+            let ipv4 = compose_tcp(&tcp, ipv4.source, self.anet_peer_ip);
+            // compose function should recompute checksum
+            // send to peer via MAC
+            self.ip_txrx.send(&ipv4);
+
+            log::debug!("forward I->A TCP, anet_port={}", anet_port);
+          }
+
+          Some(())
+        });
       }
       Err(_) => {
-        // TODO: logging
         // other transport protocol, ignored
+        log::debug!("forward I->A UNKNOWN, discard packet");
         return;
       }
     }
@@ -236,7 +305,7 @@ impl IpLayerGateway {
   /// handle network traffic: Athernet -> other LAN
   fn handle_out(&mut self) {
     let maybe_ipv4 = self.ip_txrx.recv_poll();
-    // on receiving IPv4 packet from peer: forward it to internet
+    // on receiving IPv4 packet from peer: forward it to Internet
     if let Some(ipv4) = maybe_ipv4 {
       log::debug!(
         "recv ipv4 from Athernet-MAC {:?} -> {:?}, into forward A->I",
@@ -281,15 +350,12 @@ impl IpLayerGateway {
     );
 
     Ok(Self {
-      anet_self_ip: self_addr.1,
+      _anet_self_ip: self_addr.1,
       anet_peer_ip: peer_addr.1,
       ip_txrx: IpOverMac::new(self_addr.0, peer_addr.0),
       rawsock: WrapRawSock::new(inet_addr)?,
       inet_self_ip: inet_addr,
-      udp_nat: NatTable::new(),
-      tcp_nat: NatTable::new(),
-      icmp_nat: NatTable::new(),
-      rng: thread_rng(),
+      nat: NatTable::new(),
     })
   }
 }

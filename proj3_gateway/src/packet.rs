@@ -161,7 +161,7 @@ fn reassemble_ipv4(bytes: impl Iterator<Item = u8>) -> Ipv4 {
 /// - Reassemble an IPv4 packet from multiple received fragments
 pub(crate) struct IpOverMac {
   mac: MacLayer,
-  self_addr: MacAddr,
+  _self_addr: MacAddr,
   peer_addr: MacAddr,
   recv_frags: Vec<u8>,
   send_frags: VecDeque<IpPackFrag>,
@@ -171,7 +171,7 @@ impl IpOverMac {
   pub fn new(self_addr: MacAddr, peer_addr: MacAddr) -> Self {
     Self {
       mac: MacLayer::new_with_default_phy(self_addr),
-      self_addr,
+      _self_addr: self_addr,
       peer_addr,
       recv_frags: Default::default(),
       send_frags: Default::default(),

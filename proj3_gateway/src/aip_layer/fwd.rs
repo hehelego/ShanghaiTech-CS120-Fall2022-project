@@ -28,7 +28,7 @@ use std::{
 pub struct IpLayerInternal {
   // L2/L3 address
   self_ip: Ipv4Addr,
-  peer_ip: Ipv4Addr,
+  _peer_ip: Ipv4Addr,
   // send/recv IPv4 packets via MAC
   ip_txrx: IpOverMac,
   // IPC
@@ -164,7 +164,7 @@ impl IpLayerInternal {
 
     Ok(Self {
       self_ip: self_addr.1,
-      peer_ip: peer_addr.1,
+      _peer_ip: peer_addr.1,
       ip_txrx: IpOverMac::new(self_addr.0, peer_addr.0),
       ipc,
       socks_in_use: Default::default(),
