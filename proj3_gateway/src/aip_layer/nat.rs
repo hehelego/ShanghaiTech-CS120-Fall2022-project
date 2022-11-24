@@ -25,20 +25,15 @@ struct WrapRawSock {
 }
 
 impl WrapRawSock {
-  fn new() -> Result<Self> {
+  fn new(inet_addr: Ipv4Addr) -> Result<Self> {
     // RAW IP packet socket creation
     // Credit: https://stackoverflow.com/questions/33272644/raw-socket-unexpected-ip-header-added-when-sending-self-made-ip-tcp-packets
     // see also `man protocol(5)`
-    let rawsock = Socket::new(Domain::IPV4, Type::RAW, Some(Protocol::from(4)))?;
+    let rawsock = Socket::new(Domain::IPV4, Type::RAW, Some(Protocol::TCP))?;
     rawsock.set_header_included(false)?;
     rawsock.set_read_timeout(Some(RAWSOCK_TIMEOUT))?;
     rawsock.set_write_timeout(Some(RAWSOCK_TIMEOUT))?;
-    rawsock.bind(&SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 0).into())?;
-    let inet_addr = *rawsock
-      .local_addr()?
-      .as_socket_ipv4()
-      .ok_or(ErrorKind::InvalidInput)?
-      .ip();
+    rawsock.bind(&SocketAddrV4::new(inet_addr, 0).into())?;
     Ok(Self {
       recv_buf: [MaybeUninit::zeroed(); RAWIP_PACK_SIZE],
       send_buf: [0; RAWIP_PACK_SIZE],
@@ -47,7 +42,9 @@ impl WrapRawSock {
     })
   }
   fn recv(&mut self) -> Result<Ipv4> {
+    log::debug!("try to get a packet from RAW SOCKET");
     let n = self.rawsock.recv(&mut self.recv_buf)?;
+    log::debug!("get a packet from RAW SOCKET");
     let ipv4 = unsafe {
       let buf: [u8; RAWIP_PACK_SIZE] = transmute(self.recv_buf);
       let ipv4_pack = Ipv4Packet::new(&buf[..n]).ok_or(ErrorKind::InvalidData)?;
@@ -143,6 +140,7 @@ pub struct IpLayerGateway {
   ip_txrx: IpOverMac,
   // raw socket for send/recv IPv4 packets: in Internet instead of Athernet
   rawsock: WrapRawSock,
+  inet_self_ip: Ipv4Addr,
   // NAT table:
   udp_nat: NatTable,
   tcp_nat: NatTable,
@@ -166,7 +164,7 @@ impl IpLayerGateway {
           let inet_port = self.udp_nat.anet_to_inet(udp.source).unwrap();
           udp.source = inet_port;
           // UDP NAT: change source address
-          let ipv4 = compose_udp(&udp, self.rawsock.inet_addr, ipv4.destination);
+          let ipv4 = compose_udp(&udp, self.inet_self_ip, ipv4.destination);
           // compose function should recompute checksum
           let _ = self.rawsock.send(ipv4);
 
@@ -189,7 +187,7 @@ impl IpLayerGateway {
           if let Some(anet_port) = self.udp_nat.inet_to_anet(udp.destination) {
             // UDP NAT: change dest port
             udp.destination = anet_port;
-            // UDP NAT: change dest port
+            // UDP NAT: change dest address
             let ipv4 = compose_udp(&udp, ipv4.source, self.anet_peer_ip);
             // compose function should recompute checksum
             self.ip_txrx.send(&ipv4);
@@ -255,7 +253,8 @@ impl IpLayerGateway {
   ///
   /// - `self_addr`: the MAC address and IP address of current node
   /// - `peer_addr`: the MAC address and IP address of peer node
-  pub fn new(self_addr: (MacAddr, Ipv4Addr), peer_addr: (MacAddr, Ipv4Addr)) -> Result<Self> {
+  /// - `inet_addr`: address in the Internet
+  pub fn new(self_addr: (MacAddr, Ipv4Addr), peer_addr: (MacAddr, Ipv4Addr), inet_addr: Ipv4Addr) -> Result<Self> {
     log::debug!(
       "starting IP layer for gateway@{:?}, internal@{:?}",
       self_addr,
@@ -266,7 +265,8 @@ impl IpLayerGateway {
       anet_self_ip: self_addr.1,
       anet_peer_ip: peer_addr.1,
       ip_txrx: IpOverMac::new(self_addr.0, peer_addr.0),
-      rawsock: WrapRawSock::new()?,
+      rawsock: WrapRawSock::new(inet_addr)?,
+      inet_self_ip: inet_addr,
       udp_nat: NatTable::new(),
       tcp_nat: NatTable::new(),
       icmp_nat: NatTable::new(),
