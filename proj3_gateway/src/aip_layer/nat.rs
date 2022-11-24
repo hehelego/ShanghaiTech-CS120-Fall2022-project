@@ -9,7 +9,7 @@ use pnet::packet::{
 };
 use proj2_multiple_access::MacAddr;
 use rand::{rngs::ThreadRng, thread_rng, Rng};
-use socket2::{Domain, Protocol, Socket, Type};
+use socket2::{Domain, Socket, Type};
 use std::{
   collections::HashMap,
   io::{ErrorKind, Result},
@@ -21,45 +21,64 @@ struct WrapRawSock {
   recv_buf: [MaybeUninit<u8>; RAWIP_PACK_SIZE],
   send_buf: [u8; RAWIP_PACK_SIZE],
   inet_addr: Ipv4Addr,
-  rawsock: Socket,
+  rawsock_udp: Socket,
+  rawsock_icmp: Socket,
+  rawsock_tcp: Socket,
 }
 
 impl WrapRawSock {
-  fn new(inet_addr: Ipv4Addr) -> Result<Self> {
-    // RAW IP packet socket creation
+  fn rawsock_new(addr: Ipv4Addr, protocol: ASockProtocol) -> Result<Socket> {
+    let rawsock = Socket::new(Domain::IPV4, Type::RAW, Some(protocol.into()))?;
     // Credit: https://stackoverflow.com/questions/33272644/raw-socket-unexpected-ip-header-added-when-sending-self-made-ip-tcp-packets
-    // see also `man protocol(5)`
-    let rawsock = Socket::new(Domain::IPV4, Type::RAW, Some(Protocol::TCP))?;
-    rawsock.set_header_included(false)?;
+    rawsock.set_header_included(true)?;
     rawsock.set_read_timeout(Some(RAWSOCK_TIMEOUT))?;
     rawsock.set_write_timeout(Some(RAWSOCK_TIMEOUT))?;
-    rawsock.bind(&SocketAddrV4::new(inet_addr, 0).into())?;
+    rawsock.bind(&SocketAddrV4::new(addr, 0).into())?;
+    Ok(rawsock)
+  }
+
+  fn new(addr: Ipv4Addr) -> Result<Self> {
     Ok(Self {
       recv_buf: [MaybeUninit::zeroed(); RAWIP_PACK_SIZE],
       send_buf: [0; RAWIP_PACK_SIZE],
-      rawsock,
-      inet_addr,
+      inet_addr: addr,
+      rawsock_udp: Self::rawsock_new(addr, ASockProtocol::UDP)?,
+      rawsock_icmp: Self::rawsock_new(addr, ASockProtocol::ICMP)?,
+      rawsock_tcp: Self::rawsock_new(addr, ASockProtocol::TCP)?,
     })
   }
   fn recv(&mut self) -> Result<Ipv4> {
-    log::debug!("try to get a packet from RAW SOCKET");
-    let n = self.rawsock.recv(&mut self.recv_buf)?;
-    log::debug!("get a packet from RAW SOCKET");
+    let n = self
+      .rawsock_udp
+      .recv(&mut self.recv_buf)
+      .or_else(|_| self.rawsock_icmp.recv(&mut self.recv_buf))
+      .or_else(|_| self.rawsock_tcp.recv(&mut self.recv_buf))?;
+
     let ipv4 = unsafe {
       let buf: [u8; RAWIP_PACK_SIZE] = transmute(self.recv_buf);
       let ipv4_pack = Ipv4Packet::new(&buf[..n]).ok_or(ErrorKind::InvalidData)?;
       ipv4_pack.from_packet()
     };
     assert_eq!(ipv4.destination, self.inet_addr);
+    let protocol: ASockProtocol = ipv4.next_level_protocol.try_into()?;
+    log::info!("get a {:?} packet from raw socket", protocol);
     Ok(ipv4)
   }
   fn send(&mut self, ipv4: Ipv4) -> Result<()> {
     assert_eq!(ipv4.source, self.inet_addr);
+
+    let sock = match ipv4.next_level_protocol.try_into()? {
+      ASockProtocol::UDP => &self.rawsock_udp,
+      ASockProtocol::ICMP => &self.rawsock_icmp,
+      ASockProtocol::TCP => &self.rawsock_tcp,
+    };
+
     let len = ipv4.total_length as usize;
     let dest = SocketAddrV4::new(ipv4.destination, 0);
     let mut pack = MutableIpv4Packet::new(&mut self.send_buf[..len]).ok_or(ErrorKind::InvalidData)?;
     pack.populate(&ipv4);
-    self.rawsock.send_to(&pack.packet(), &dest.into())?;
+    sock.send_to(&pack.packet(), &dest.into())?;
+
     Ok(())
   }
 }
