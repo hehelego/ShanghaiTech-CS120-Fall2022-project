@@ -4,7 +4,7 @@ use crate::{
   ASockProtocol,
 };
 use pnet::packet::{
-  icmp::{Icmp, IcmpTypes},
+  icmp::{Icmp, IcmpCode, IcmpTypes},
   ipv4::{Ipv4, Ipv4Packet, MutableIpv4Packet},
   FromPacket, Packet,
 };
@@ -310,18 +310,25 @@ impl IpLayerGateway {
   fn handle_out(&mut self) {
     // try to receive IPv4 packet in Athernet
     let maybe_ipv4 = self.ip_txrx.recv_poll();
-    // on receiving IPv4 packet from peer: forward it to Internet
+    // on receiving IPv4 packet from peer
     if let Some(ipv4) = maybe_ipv4 {
+      log::debug!(
+        "recv ipv4 from Athernet-MAC {:?} -> {:?}",
+        ipv4.source,
+        ipv4.destination
+      );
+      if ipv4.destination == self.anet_self_ip {
+        log::debug!("last packet is targeting us");
+        self.on_recv_ipv4(&ipv4);
+        return;
+      }
       match self.pack_dest_net(&ipv4) {
+        // route the packet in Athernet
         DestNet::Athernet => {
           self.ip_txrx.send(&ipv4);
         }
+        // forward it to Internet
         DestNet::Internet => {
-          log::debug!(
-            "recv ipv4 from Athernet-MAC {:?} -> {:?}, into forward A->I",
-            ipv4.source,
-            ipv4.destination
-          );
           self.forward_out(ipv4);
         }
       }
@@ -346,6 +353,31 @@ impl IpLayerGateway {
       self.handle_in();
       self.handle_out();
     }
+  }
+
+  /// handle ICMP ping request message comming from another node
+  fn handle_ping(&mut self, icmp: Icmp, from: Ipv4Addr) {
+    if icmp.icmp_type == IcmpTypes::EchoRequest {
+      log::debug!("response to ping request from {:?} in Athernet", from,);
+      let icmp = Icmp {
+        icmp_type: IcmpTypes::EchoReply,
+        icmp_code: IcmpCode(0),
+        checksum: 0,
+        payload: icmp.payload,
+      };
+      let ipv4 = compose_icmp(&icmp, self.anet_self_ip, from);
+      self.ip_txrx.send(&ipv4);
+    }
+  }
+  /// called when receiving an ipv4 packet to us
+  fn on_recv_ipv4(&mut self, ipv4: &Ipv4) {
+    // handle ICMP echo request
+    if let Ok(ASockProtocol::ICMP) = ipv4.next_level_protocol.try_into() {
+      if let Some(icmp) = parse_icmp(ipv4) {
+        self.handle_ping(icmp, ipv4.source);
+      }
+    }
+    // TODO: allow gateway node to have Athernet transport layer
   }
 
   /// Build IP layer on top of MAC layer.
