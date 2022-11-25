@@ -102,7 +102,7 @@ impl IpLayerInternal {
     }) {
       // forward the IPv4 packet to that process for further handling
       let pack = Response::ReceivedPacket(ipv4.into());
-      let _ = send_packet(&self.ipc, &bind_ipc.as_sockaddr(), &pack);
+      send_packet(&self.ipc, &bind_ipc.as_sockaddr(), &pack);
     } else {
       log::debug!("unkonwn protocol, discard the packet");
     }
@@ -111,7 +111,7 @@ impl IpLayerInternal {
   fn on_bind_failed(&self, ipc_path: IpcPath) {
     log::debug!("previous bind request failed");
     let pack = Response::BindResult(false);
-    let _ = send_packet(&self.ipc, &ipc_path.as_sockaddr(), &pack);
+    send_packet(&self.ipc, &ipc_path.as_sockaddr(), &pack);
   }
   /// called on a process request to bind a socket:
   /// try to add the (socket address <-> IPC socket) mapping.
@@ -124,7 +124,7 @@ impl IpLayerInternal {
     }
     let pack = Response::BindResult(true);
     self.socks_in_use.insert(ipc_path.clone(), (protocol, addr));
-    let _ = send_packet(&self.ipc, &ipc_path.as_sockaddr(), &pack);
+    send_packet(&self.ipc, &ipc_path.as_sockaddr(), &pack);
     log::debug!("bind success");
 
     let _ = match protocol {

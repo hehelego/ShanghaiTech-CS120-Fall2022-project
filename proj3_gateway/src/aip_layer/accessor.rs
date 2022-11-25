@@ -1,6 +1,6 @@
 use crate::{
   aip_layer::ipc::{extract_ip_pack, recv_packet, send_packet, Request, Response},
-  common::{aip_ipc_sockaddr, IPC_TIMEOUT},
+  common::{aip_ipc_sockaddr, IPC_TIMEOUT, IPC_RETRY_WAIT},
   packet::{compose_icmp, compose_tcp, compose_udp, parse_icmp, parse_tcp, parse_udp},
   ASockProtocol,
 };
@@ -12,7 +12,7 @@ use std::{
   io::{ErrorKind, Result},
   net::{Ipv4Addr, SocketAddrV4},
   sync::Arc,
-  thread::{spawn, JoinHandle},
+  thread::{spawn, JoinHandle, sleep},
 };
 
 use super::ipc::IpcPath;
@@ -28,17 +28,15 @@ impl Worker {
   /// repeatedly received [`ipc::Response`] packets from the provider.
   fn work(ipc: Arc<Socket>, pack_tx: Sender<Ipv4>, exit_rx: Receiver<()>) {
     while exit_rx.try_recv().is_err() {
-      match recv_packet::<Response>(&ipc) {
-        // probability received a response packet, try to extract the append result
-        Ok(resp) => {
-          if let Ok(packet) = extract_ip_pack(resp) {
-            pack_tx.send(packet).unwrap();
-          }
+      if let Ok(resp) = recv_packet(&ipc) {
+        if let Ok(ipv4) = extract_ip_pack(resp) {
+          log::debug!(
+            "IP accessor got a packet {:?}->{:?} from IP provider",
+            ipv4.source,
+            ipv4.destination
+          );
+          pack_tx.send(ipv4).unwrap();
         }
-        // timeout, no packet is received, wait for future packets
-        Err(e) if e.kind() == ErrorKind::TimedOut => continue,
-        // other error occurred, exit
-        _ => break,
       }
     }
   }
@@ -84,12 +82,14 @@ impl IpAccessor {
   /// The accessor object will create a unix domain socket on `sock_path`
   /// and communicate via [`IpProvider`] which is listening on [`IpProvider::SOCK_PATH`].
   pub fn new(sock_path: &str) -> Result<Self> {
+    log::debug!("creating an IP accessor@{}", sock_path);
     // unix domain socket creation
     let _ = std::fs::remove_file(sock_path);
     let ipc = Socket::new(Domain::UNIX, Type::DGRAM, None)?;
     ipc.set_read_timeout(Some(IPC_TIMEOUT))?;
     ipc.set_write_timeout(Some(IPC_TIMEOUT))?;
     ipc.bind(&SockAddr::unix(sock_path)?)?;
+    log::debug!("IP accessor@{} created", sock_path);
     Ok(Self {
       ipc: Arc::new(ipc),
       ipc_path: IpcPath::new(sock_path),
@@ -110,10 +110,26 @@ impl IpAccessor {
     if self.bind_addr.borrow().is_some() {
       return Err(ErrorKind::AddrInUse.into());
     }
+    log::debug!("Try to bind {:?} for {:?}@{:?}", self.ipc_path, sock_type, sock_addr);
+
     // communicate with provider to bind
     let bind_request = Request::BindSocket(self.ipc_path.clone(), sock_type, sock_addr);
-    send_packet(&self.ipc, &aip_ipc_sockaddr(), &bind_request)?;
-    let bind_response = recv_packet(&self.ipc)?;
+    send_packet(&self.ipc, &aip_ipc_sockaddr(), &bind_request);
+    let bind_response = loop{
+      if let Ok(resp) = recv_packet(&self.ipc){
+        break resp;
+      }else {
+        sleep(IPC_RETRY_WAIT);
+      }
+    };
+
+    log::debug!(
+      "Bind result {:?}: {:?} for {:?}@{:?}",
+      bind_response,
+      self.ipc_path,
+      sock_type,
+      sock_addr
+    );
     // expecting a correct response
     match bind_response {
       Response::BindResult(true) => {
@@ -129,8 +145,9 @@ impl IpAccessor {
   /// also stop the worker thread
   fn unbind(&self) -> Result<()> {
     if let Some(worker) = self.worker.borrow_mut().take() {
+      log::debug!("Unbind socket for {:?}", self.ipc_path);
       let unbind_request = Request::UnbindSocket(self.ipc_path.clone());
-      send_packet(&self.ipc, &aip_ipc_sockaddr(), &unbind_request)?;
+      send_packet(&self.ipc, &aip_ipc_sockaddr(), &unbind_request);
       drop(worker);
     }
     *self.bind_addr.borrow_mut() = None;
@@ -138,7 +155,11 @@ impl IpAccessor {
   }
 
   fn recv_ipv4(&self) -> Result<Ipv4> {
-    self.worker.borrow().as_ref().expect("recv on unbind socket").recv()
+    self.worker.borrow().as_ref().expect("recv on an unbind socket").recv()
+  }
+
+  fn bind_addr(&self) -> Ipv4Addr{
+    self.bind_addr.borrow().expect("request local address of an unbind socket")
   }
 }
 
@@ -152,9 +173,9 @@ impl Drop for IpAccessor {
 impl IpAccessor {
   /// Send an ICMP packet via the network layer.
   pub fn send_icmp(&self, packet: Icmp, dest: Ipv4Addr) -> Result<()> {
-    let ipv4 = compose_icmp(&packet, self.bind_addr.borrow().unwrap(), dest);
+    let ipv4 = compose_icmp(&packet, self.bind_addr(), dest);
     let send_req = Request::SendPacket(ipv4.into());
-    send_packet(&self.ipc, &aip_ipc_sockaddr(), &send_req)?;
+    send_packet(&self.ipc, &aip_ipc_sockaddr(), &send_req);
     Ok(())
   }
   /// Receive an ICMP packet from the network layer.
@@ -170,9 +191,9 @@ impl IpAccessor {
 impl IpAccessor {
   /// Send a TCP packet via the network layer.
   pub fn send_tcp(&self, packet: Tcp, dest: SocketAddrV4) -> Result<()> {
-    let ipv4 = compose_tcp(&packet, self.bind_addr.borrow().unwrap(), *dest.ip());
+    let ipv4 = compose_tcp(&packet, self.bind_addr(), *dest.ip());
     let send_req = Request::SendPacket(ipv4.into());
-    send_packet(&self.ipc, &aip_ipc_sockaddr(), &send_req)?;
+    send_packet(&self.ipc, &aip_ipc_sockaddr(), &send_req);
     Ok(())
   }
   /// Receive a TCP packet from the network layer.
@@ -189,9 +210,9 @@ impl IpAccessor {
 impl IpAccessor {
   /// Send a UDP packet via the network layer.
   pub fn send_udp(&self, packet: Udp, dest: SocketAddrV4) -> Result<()> {
-    let ipv4 = compose_udp(&packet, self.bind_addr.borrow().unwrap(), *dest.ip());
+    let ipv4 = compose_udp(&packet, self.bind_addr(), *dest.ip());
     let send_req = Request::SendPacket(ipv4.into());
-    send_packet(&self.ipc, &aip_ipc_sockaddr(), &send_req)?;
+    send_packet(&self.ipc, &aip_ipc_sockaddr(), &send_req);
     Ok(())
   }
   /// Receive a UDP packet from the network layer.
