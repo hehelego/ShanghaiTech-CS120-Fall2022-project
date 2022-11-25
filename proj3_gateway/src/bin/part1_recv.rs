@@ -8,6 +8,8 @@ struct Cli {
 }
 
 fn main() -> std::io::Result<()> {
+  env_logger::init();
+
   const SELF_ADDR: &str = "0.0.0.0";
   const DATA_SIZE: usize = 20;
   const DATA_NUM: usize = 10;

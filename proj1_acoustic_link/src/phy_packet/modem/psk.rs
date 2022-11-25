@@ -42,7 +42,7 @@ impl Modem for PSK {
     let mut bits = Vec::with_capacity(Self::SYMBOLS_PER_PACKET);
     samples.chunks_exact(Self::SAMPLES_PER_SYMBOL).for_each(|symbol| {
       let sum = dot_product(symbol.iter(), self.symbols[0].iter());
-      let bit = if sum < FP::ZERO { 1 } else { 0 };
+      let bit = (sum < FP::ZERO) as _;
       bits.push(bit);
     });
     bits_to_bytes(&bits)

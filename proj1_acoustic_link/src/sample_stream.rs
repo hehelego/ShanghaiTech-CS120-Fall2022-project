@@ -5,6 +5,6 @@ mod hound_stream;
 /// sample stream IO with a concurrent buffer, read out the written samples
 mod loopback_stream;
 
-pub use cpal_stream::{CpalPowerProbe, CpalInStream, CpalOutStream};
+pub use cpal_stream::{CpalInStream, CpalOutStream, CpalPowerProbe};
 pub use hound_stream::{HoundInStream, HoundOutStream};
 pub use loopback_stream::LoopBackStream;
