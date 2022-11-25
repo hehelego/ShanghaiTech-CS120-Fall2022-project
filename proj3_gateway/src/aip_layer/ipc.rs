@@ -18,7 +18,7 @@ use std::{
 fn send_packet_once<T: Serialize>(socket: &Socket, addr: &SockAddr, packet: &T) -> Result<()> {
   log::trace!("IPC socket try to send a packet");
   let packet = serde_json::to_vec(packet)?;
-  dbg!(socket.send_to(&packet, addr))?;
+  socket.send_to(&packet, addr)?;
   Ok(())
 }
 pub(crate) fn send_packet<T: Serialize>(socket: &Socket, addr: &SockAddr, packet: &T) {

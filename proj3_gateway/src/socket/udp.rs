@@ -31,9 +31,8 @@ impl UdpSocket {
     self.accessor.send_udp(udp_packet, addr)?;
     Ok(bytes_written)
   }
-  pub fn recv_from(&self, buf: &mut [u8]) -> Result<(usize, SocketAddrV4)> {
+  pub fn recv_from(&self) -> Result<(Vec<u8>, SocketAddrV4)> {
     let (Udp { payload, length, .. }, addr) = self.accessor.recv_udp()?;
-    buf[..length as usize].clone_from_slice(&payload);
-    Ok((length as usize, addr))
+    Ok((payload[..(length as usize - 8)].to_vec(), addr))
   }
 }
