@@ -286,6 +286,8 @@ impl IpLayerGateway {
           // compose function should recompute checksum
           // send to peer via MAC
           self.ip_txrx.send(&ipv4);
+
+          log::debug!("forward I->A ICMP");
         }
       }
       Ok(ASockProtocol::TCP) => {
