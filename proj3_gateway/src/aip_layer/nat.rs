@@ -180,9 +180,13 @@ fn icmp_can_pass(icmp: &Icmp) -> bool {
   if icmp.icmp_type == IcmpTypes::EchoReply {
     true
   } else if icmp.icmp_type == IcmpTypes::EchoRequest {
-    let payload_len = icmp.payload.len();
-    let suffix_len = NAT_ICMP_BYPASS_PATTERN.len();
-    &icmp.payload[payload_len - suffix_len..] == NAT_ICMP_BYPASS_PATTERN
+    // See pnet document: first four bytes of icmp.payload are id(0..2) and seq(2..4)
+    // <https://docs.rs/pnet/latest/pnet/packet/icmp/echo_request/struct.EchoRequest.html>
+    // <https://docs.rs/pnet/latest/pnet/packet/icmp/struct.Icmp.html>
+    String::from_utf8_lossy(&icmp.payload[4..])
+      .matches(NAT_ICMP_BYPASS_PATTERN)
+      .count()
+      > 0
   } else {
     false
   }
