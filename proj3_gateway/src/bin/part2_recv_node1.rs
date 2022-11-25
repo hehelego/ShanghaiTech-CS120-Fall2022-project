@@ -32,7 +32,7 @@ fn main() {
       } else {
         if blank_line {
           blank_line = false;
-          writeln!(output_file, "").unwrap();
+          writeln!(output_file).unwrap();
         }
         writeln!(output_file, "{}", String::from_utf8(data).unwrap()).unwrap();
       }
