@@ -23,13 +23,11 @@ fn main() {
   let mut lines_count = 0;
 
   println!("Starting send data to {dest_addr}");
-  for line in data_lines {
-    if let Ok(data) = line {
-      let data = data.as_bytes();
-      upd_socket.send_to(data, dest_addr).unwrap();
-      println!("Send {} bytes", data.len());
-      lines_count += 1;
-    }
+  for line in data_lines.flatten() {
+    let data = line.as_bytes();
+    upd_socket.send_to(data, dest_addr).unwrap();
+    println!("Send {} bytes", data.len());
+    lines_count += 1;
   }
   // Send two blank line to end the transmission
   upd_socket.send_to("".as_bytes(), dest_addr).unwrap();

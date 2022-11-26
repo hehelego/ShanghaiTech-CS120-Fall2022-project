@@ -17,8 +17,8 @@ pub const IPC_TIMEOUT: Duration = Duration::from_millis(10);
 pub const RAWSOCK_TIMEOUT: Duration = Duration::from_millis(10);
 
 /// NAT will forward external ICMP ping request into LAN
-/// if the payload has a specific suffix
-pub const NAT_ICMP_BYPASS_PATTERN: &[u8] = &[0xff, 0xff, 0xff, 0xff];
+/// if the payload has a specific substring
+pub const NAT_ICMP_BYPASS_PATTERN: &str = "Freiheit";
 
 /// The UNIX domain socket on which the IP layer provider is bind
 pub const AIP_SOCK: &str = "/tmp/athernet_ip_server.sock";

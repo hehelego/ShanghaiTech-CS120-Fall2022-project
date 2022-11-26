@@ -23,7 +23,7 @@ impl IcmpSocket {
   pub fn bind(addr: Ipv4Addr) -> Result<Self> {
     let ipc_path = &(format!("icmp_{}", addr));
     let accessor = IpAccessor::new(ipc_path)?;
-    accessor.bind(ASockProtocol::ICMP, SocketAddrV4::new(addr, 0).into())?;
+    accessor.bind(ASockProtocol::ICMP, SocketAddrV4::new(addr, 0))?;
     Ok(Self {
       ip_sock: accessor,
       buf: RefCell::new(Vec::new()),

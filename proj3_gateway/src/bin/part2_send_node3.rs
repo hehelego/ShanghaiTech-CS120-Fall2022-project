@@ -33,13 +33,11 @@ fn main() -> std::io::Result<()> {
   let mut lines_count = 0;
   println!("Starting send data to {dest_addr}:{dest_port}");
   let dest_addr = (dest_addr.as_str(), dest_port);
-  for line in data_lines {
-    if let Ok(data) = line {
-      let data = data.as_bytes();
-      udp_socket.send_to(data, dest_addr).unwrap();
-      println!("Send {} bytes", data.len());
-      lines_count += 1;
-    }
+  for line in data_lines.flatten() {
+    let data = line.as_bytes();
+    udp_socket.send_to(data, dest_addr).unwrap();
+    println!("Send {} bytes", data.len());
+    lines_count += 1;
   }
   // Send two blank line to end the transmission
   udp_socket.send_to("".as_bytes(), dest_addr).unwrap();
