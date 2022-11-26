@@ -1,48 +1,14 @@
-use crossbeam_channel::{unbounded, Receiver, Sender};
-use pnet::packet::tcp::Tcp;
+use crossbeam_channel::{Receiver, Sender};
 use std::{
   net::SocketAddrV4,
   time::{Duration, Instant},
 };
 
 use super::ASockProtocol;
+use tcp_state_machine::TcpStateMachine;
 
 /// A socket for sending/receiving TCP packets.
 /// Provides transport layer APIs.
-
-enum TcpState {
-  SynSent,
-  SynReceived,
-  Established,
-  FinWait1,
-  FinWait2,
-  Closing,
-  CloseWait,
-  LastAck,
-  Closed,
-}
-
-pub(crate) struct TcpStateMachine {
-  state: TcpState,
-  bytes_assembled: Sender<u8>,
-  packet_received: Receiver<Tcp>,
-  bytes_to_send: Receiver<u8>,
-}
-
-impl TcpStateMachine {
-  pub fn new(bytes_assembled: Sender<u8>, bytes_to_send: Receiver<u8>, addr: SocketAddrV4) -> Self {
-    todo!()
-  }
-  pub fn connect(&self) {
-    todo!()
-  }
-  pub fn sync(&self, dest: SocketAddrV4) -> Result<(), ()> {
-    todo!()
-  }
-  pub fn shutdown(&self) -> Result<(), ()> {
-    todo!()
-  }
-}
 
 pub struct TcpStream {
   bytes_to_send: Sender<u8>,
@@ -79,7 +45,13 @@ impl TcpStream {
   }
 
   pub fn connect(&mut self, dest: SocketAddrV4) -> Result<(), ()> {
-    self.state_machine.sync(dest)
+    const HAND_SHAKE_MAX_TIME: Duration = Duration::from_secs(6);
+    self.state_machine.connect(dest)?;
+    self
+      .bytes_assembled
+      .recv_deadline(Instant::now() + HAND_SHAKE_MAX_TIME)
+      .map_err(|_| ())?;
+    Ok(())
   }
 
   pub fn shutdown(&self) -> Result<(), ()> {
@@ -144,3 +116,6 @@ impl TcpListener {
     todo!()
   }
 }
+
+pub mod tcp_state_machine;
+pub mod wrapping_integers;
