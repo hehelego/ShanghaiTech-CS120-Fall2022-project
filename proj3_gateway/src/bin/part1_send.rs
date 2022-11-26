@@ -18,6 +18,8 @@ struct Cli {
 }
 
 fn main() -> std::io::Result<()> {
+  env_logger::init();
+
   // Constants
   const PAYLOAD_BYTES: usize = 20;
   const LOOP_TIME: usize = 10;

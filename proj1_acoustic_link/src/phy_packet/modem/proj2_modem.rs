@@ -7,11 +7,7 @@ use crate::{
 fn get_bit(symbol: &[FP], reference: &[FP]) -> u8 {
   assert_eq!(symbol.len(), reference.len());
   let sum = dot_product(symbol.iter(), reference.iter());
-  if sum < FP::ZERO {
-    1
-  } else {
-    0
-  }
+  (sum < FP::ZERO) as _
 }
 fn add_vec(v_lo: &[FP], v_hi: &[FP], b_lo: u8, b_hi: u8) -> Vec<FP> {
   fn f00(x_lo: &FP, x_hi: &FP) -> FP {

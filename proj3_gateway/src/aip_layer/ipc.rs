@@ -1,4 +1,7 @@
-use crate::{common::IPC_PACK_SIZE, ASockProtocol};
+use crate::{
+  common::{IPC_PACK_SIZE, IPC_RETRY_WAIT},
+  ASockProtocol,
+};
 use pnet::packet::{
   ipv4::{Ipv4, Ipv4Packet, MutableIpv4Packet},
   FromPacket,
@@ -9,14 +12,24 @@ use std::{
   io::{ErrorKind, Result},
   mem,
   net::SocketAddrV4,
+  thread::sleep,
 };
 
-pub(crate) fn send_packet<T: Serialize>(socket: &Socket, addr: &SockAddr, packet: &T) -> Result<()> {
+fn send_packet_once<T: Serialize>(socket: &Socket, addr: &SockAddr, packet: &T) -> Result<()> {
+  log::trace!("IPC socket try to send a packet");
   let packet = serde_json::to_vec(packet)?;
   socket.send_to(&packet, addr)?;
   Ok(())
 }
+pub(crate) fn send_packet<T: Serialize>(socket: &Socket, addr: &SockAddr, packet: &T) {
+  while send_packet_once(socket, addr, packet).is_err() {
+    sleep(IPC_RETRY_WAIT);
+    log::trace!("IPC packet send retry");
+  }
+}
+
 pub(crate) fn recv_packet<T: DeserializeOwned>(socket: &Socket) -> Result<T> {
+  log::trace!("IPC socket try to receive a packet",);
   let mut recv_buf = vec![mem::MaybeUninit::zeroed(); IPC_PACK_SIZE];
   let (n, _) = socket.recv_from(&mut recv_buf)?;
   let buf = recv_buf[..n]

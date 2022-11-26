@@ -49,7 +49,7 @@ impl Simple {
   }
 
   fn can_send_packet(&self) -> bool {
-    return self.pending_packets.len() < Self::WINDOW_SIZE && !self.packets_to_send.is_empty();
+    self.pending_packets.len() < Self::WINDOW_SIZE && !self.packets_to_send.is_empty()
   }
 
   fn check_and_send_packet(&mut self) {
