@@ -1,6 +1,6 @@
 use clap::{Parser, Subcommand};
 use proj3_gateway::IcmpSocket;
-use std::io::{BufRead, BufReader, Error, ErrorKind, Result};
+use std::io::{BufRead, BufReader, ErrorKind, Result};
 use std::net::Ipv4Addr;
 use std::process;
 use std::time::Instant;
@@ -38,12 +38,9 @@ enum Ping {
 
 fn dns_resolve(host: String) -> Result<Ipv4Addr> {
   let stdout = process::Command::new("dig").arg("+short").arg(host).output()?.stdout;
-
-  let mut reader = BufReader::new(&stdout[..]);
-  let mut addr = String::new();
-  reader.read_line(&mut addr)?;
-
-  addr.trim().parse().map_err(|e| Error::new(ErrorKind::NotFound, e))
+  let resolved = BufReader::new(&stdout[..]).lines().filter_map(|x| x.ok());
+  let parsed = resolved.filter_map(|x| x.parse().ok());
+  parsed.last().ok_or_else(|| ErrorKind::InvalidInput.into())
 }
 
 fn main() -> Result<()> {
