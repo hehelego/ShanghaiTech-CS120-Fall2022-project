@@ -3,7 +3,7 @@ use proj3_gateway::IcmpSocket;
 use std::io::{BufRead, BufReader, Error, ErrorKind, Result};
 use std::net::Ipv4Addr;
 use std::process;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 const DEFAULT_PING_MSG: &str = "across the great wall we can reach the world";
 
@@ -65,21 +65,35 @@ fn main() -> Result<()> {
 
   let id = rand::random();
   let mut total_time = 0;
+  let mut receive_cout = 0;
   for seq in (0..rounds).map(|x| x as u16) {
     let start = Instant::now();
     sock.send_ping(id, seq, payload.as_bytes(), dest).unwrap();
-    let reply_payload = sock.recv_pong(id, seq, dest).unwrap();
-    let rtt = start.elapsed().as_millis() as u32;
-    total_time += rtt;
-    println!(
-      "REPLY(seq={}) from {:?} RTT={}ms with: {:?}",
-      seq,
-      dest,
-      rtt,
-      String::from_utf8(reply_payload),
-    );
+    if let Ok(reply_payload) = sock.recv_pong_timeout(id, seq, dest, Duration::from_secs(5)) {
+      let rtt = start.elapsed().as_millis() as u32;
+      receive_cout += 1;
+      total_time += rtt;
+      println!(
+        "REPLY(seq={}) from {:?} RTT={}ms with: {:?}",
+        seq,
+        dest,
+        rtt,
+        String::from_utf8(reply_payload),
+      );
+    } else {
+      println!("REPLY(seq={}) from {:?} timeout", seq, dest)
+    }
   }
-  println!("average RTT of {} packets is {}", rounds, total_time / rounds);
+  if receive_cout > 0 {
+    println!(
+      "average RTT of {} packets is {} ms.",
+      receive_cout,
+      total_time / receive_cout
+    );
+    println!("{}/{} received", receive_cout, rounds);
+  } else {
+    println!("All of the pacekets are lost");
+  }
 
   Ok(())
 }
