@@ -1,3 +1,6 @@
+//! The tcp API. This module provide two types of the tcp socket: TcpStream and TcpListner.
+//! TcpStream is used for client and TcpListner is for the server.
+
 use crossbeam_channel::{Receiver, Sender};
 use std::{
   net::SocketAddrV4,
@@ -9,7 +12,6 @@ use tcp_state_machine::TcpStateMachine;
 
 /// A socket for sending/receiving TCP packets.
 /// Provides transport layer APIs.
-
 pub struct TcpStream {
   bytes_to_send: Sender<u8>,
   bytes_assembled: Receiver<u8>,
@@ -18,7 +20,8 @@ pub struct TcpStream {
 
 impl TcpStream {
   pub const PROTOCOL: ASockProtocol = ASockProtocol::TCP;
-
+  /// Bind the TcpStream to a local addresss.
+  /// Returns a TcpStream if success.
   pub fn bind(addr: SocketAddrV4) -> Result<Self, ()> {
     let (bytes_assembled_tx, bytes_assmebled_rx) = crossbeam_channel::unbounded();
     let (bytes_to_send_tx, bytes_to_send_rx) = crossbeam_channel::unbounded();
@@ -32,7 +35,8 @@ impl TcpStream {
     })
   }
 
-  pub(crate) fn transfer(
+  // This function is for TcpListner.
+  pub(self) fn transfer(
     bytes_to_send: Sender<u8>,
     bytes_assembled: Receiver<u8>,
     state_machine: TcpStateMachine,
@@ -43,7 +47,8 @@ impl TcpStream {
       state_machine,
     }
   }
-
+  /// Connect the TcpStream to a remote address.
+  /// Return Error if connections timeout.
   pub fn connect(&mut self, dest: SocketAddrV4) -> Result<(), ()> {
     const HAND_SHAKE_MAX_TIME: Duration = Duration::from_secs(6);
     self.state_machine.connect(dest)?;
@@ -54,9 +59,13 @@ impl TcpStream {
     Ok(())
   }
 
+  /// Shutdown the TcpStream
   pub fn shutdown(&self) -> Result<(), ()> {
     self.state_machine.shutdown()
   }
+
+  /// Try to read data to buf. Wait for at most `timeout` time. If `timeout` is None, the function is blocking.
+  /// Returns the length of data read on success.
   pub fn read_timeout(&self, buf: &mut [u8], timeout: Option<Duration>) -> Result<usize, ()> {
     let mut bytes_read = 0;
     if let Some(timeout) = timeout {
@@ -71,6 +80,7 @@ impl TcpStream {
         }
       }
     } else {
+      // blocking
       for x in buf.iter_mut() {
         match self.bytes_assembled.recv() {
           Ok(byte) => {
@@ -83,6 +93,9 @@ impl TcpStream {
     }
     Ok(bytes_read)
   }
+
+  /// Try to write data from buf. Wait for at most `timeout` time. If `timeout` is None, the function is blocking.
+  /// Returns the length of data written on success.
   pub fn write_timeout(&self, buf: &[u8], timeout: Option<Duration>) -> Result<usize, ()> {
     let mut byte_writes = 0;
     if let Some(timeout) = timeout {
@@ -94,6 +107,7 @@ impl TcpStream {
         }
       }
     } else {
+      // blocking
       for x in buf.iter() {
         match self.bytes_to_send.send(*x) {
           Ok(_) => byte_writes += 1,
