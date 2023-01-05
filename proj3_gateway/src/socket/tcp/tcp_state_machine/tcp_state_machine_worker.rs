@@ -305,6 +305,7 @@ impl TcpStateMachineWorker {
     TcpState::Closed
   }
 
+  /// The handle function for TcpState::ESTABLISHED
   fn handle_established(&mut self) -> TcpState {
     let mut retry_times = 0;
     loop {
@@ -331,11 +332,17 @@ impl TcpStateMachineWorker {
         Err(()) => retry_times += 1,
       }
       if retry_times > Self::MAX_RETRY_COUNT {
-        return TcpState::Closed;
+        return TcpState::Terminate;
       }
     }
   }
-  // The handle function for TcpState::FinWait1
+
+  /// The handle function for TcpState::FinWait1
+  /// In this state, we have received close signal from the client.
+  /// We are trying to send all our data.
+  /// If we receive FIN from the peer, but haven't sent all of the data, we enter the CLOSING state.
+  /// If we send all the data, and the same time we reive FIN from the peer, we enter TIME_WAIT.
+  /// If we send all the data, and the peer still have data to send, we enter FIN_WAIT2.
   fn handle_fin_wait1(&mut self) -> TcpState {
     let mut fin_received = false;
     let mut retry_count = 0;
@@ -366,6 +373,9 @@ impl TcpStateMachineWorker {
     }
   }
 
+  /// Function for handle fin wait 2.
+  /// In this state, we have sent all of our data, and we wait for the peer to finish its transmission.
+  /// After receive FIN from the peer, we enter TIME_WAIT.
   fn handle_fin_wait2(&mut self) -> TcpState {
     let mut retry_times = 0;
     loop {
