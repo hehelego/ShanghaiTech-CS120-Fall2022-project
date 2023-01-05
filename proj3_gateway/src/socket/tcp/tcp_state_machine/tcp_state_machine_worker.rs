@@ -194,7 +194,7 @@ impl TcpStateMachineWorker {
         TcpState::Established => self.handle_established(),
         TcpState::FinWait1 => self.handle_fin_wait1(),
         TcpState::FinWait2 => self.handle_fin_wait2(),
-        TcpState::Closing => todo!(),
+        TcpState::Closing => self.handle_closing(),
         TcpState::CloseWait => todo!(),
         TcpState::LastAck => todo!(),
         TcpState::Closed => self.handle_closed(),
@@ -346,7 +346,7 @@ impl TcpStateMachineWorker {
   fn handle_fin_wait1(&mut self) -> TcpState {
     let mut fin_received = false;
     let mut retry_count = 0;
-    while !fin_received && !self.send_buffer.is_empty() {
+    while !fin_received && (!self.send_buffer.is_empty() || !self.bytes_to_send.is_empty()) {
       self.send_data(true);
       match self.receive_data() {
         Ok(true) => {
@@ -373,7 +373,7 @@ impl TcpStateMachineWorker {
     }
   }
 
-  /// Function for handle fin wait 2.
+  /// Function for TcpState::FinWait2.
   /// In this state, we have sent all of our data, and we wait for the peer to finish its transmission.
   /// After receive FIN from the peer, we enter TIME_WAIT.
   fn handle_fin_wait2(&mut self) -> TcpState {
@@ -392,6 +392,22 @@ impl TcpStateMachineWorker {
         return TcpState::Terminate;
       }
     }
+  }
+
+  /// Function for TcpState::CLOSING
+  fn handle_closing(&mut self) -> TcpState {
+    let mut retry_times = 0;
+    while !self.bytes_to_send.is_empty() || !self.send_buffer.is_empty() {
+      self.send_data(true);
+      match self.receive_ack() {
+        Ok(_) => retry_times = 0,
+        Err(_) => retry_times += 1,
+      }
+      if retry_times > Self::MAX_RETRY_COUNT {
+        return TcpState::Terminate;
+      }
+    }
+    TcpState::TimeWait
   }
 
   // Pack a sync packet
@@ -465,6 +481,26 @@ impl TcpStateMachineWorker {
       return Ok(false);
     }
     Err(())
+  }
+
+  fn receive_ack(&mut self) -> Result<(), ()> {
+    if let Ok((packet, addr)) = self.packet_received.recv_timeout(Self::ESTIMATE_RTT) {
+      // Wrong packet send here
+      if addr == self.src_addr {
+        // Update the send sequence
+        if packet.flags & TcpFlags::ACK != 0 {
+          // Update the buffer
+          for _ in 0..self.send_seq.update(WrappingInt32::new(packet.acknowledgement)) {
+            self.send_buffer.pop();
+          }
+        }
+        // Update peer window
+        self.peer_window_size = packet.window;
+      }
+      Ok(())
+    } else {
+      Err(())
+    }
   }
 
   fn send_data(&mut self, send_fin: bool) {
