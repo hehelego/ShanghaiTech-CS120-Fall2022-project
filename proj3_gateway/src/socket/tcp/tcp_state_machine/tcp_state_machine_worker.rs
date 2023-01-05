@@ -3,7 +3,12 @@ use super::wrapping_integers::WrappingInt32;
 use crate::{packet, IpAccessor};
 use crossbeam_channel::{select, Receiver, Sender};
 use pnet::packet::tcp::{Tcp, TcpFlags};
-use std::{net::SocketAddrV4, thread, time::Duration, usize};
+use std::{
+  net::SocketAddrV4,
+  thread,
+  time::{Duration, Instant},
+  usize,
+};
 
 use super::StateControlSignal;
 
@@ -51,9 +56,10 @@ impl Seq {
     self.absolute_seqence_number += 1;
   }
 
-  pub fn update(&mut self, new_seq: WrappingInt32) {
+  pub fn update(&mut self, new_seq: WrappingInt32) -> i32 {
     let diff = new_seq - self.initial_state_number;
     self.absolute_seqence_number += diff.max(0) as u64;
+    diff
   }
 
   pub fn add(&mut self, delta: u32) {
@@ -119,6 +125,7 @@ pub(super) struct TcpStateMachineWorker {
   state: TcpState,
   peer_window_size: u16,
   reassembler: Reassembler,
+  send_buffer: Vec<u8>,
   // Channels for communication
   packet_to_send: Sender<(Tcp, SocketAddrV4)>, // packets send to the ip accessor
   packet_received: Receiver<(Tcp, SocketAddrV4)>, // packets received from the ip accessor
@@ -132,6 +139,7 @@ pub(super) struct TcpStateMachineWorker {
 impl TcpStateMachineWorker {
   const ESTIMATE_RTT: Duration = Duration::from_secs(1);
   const MAX_DATA_LENGTH: usize = 1024;
+  const MAX_RETRY_COUNT: usize = 5;
   /// Create a new TcpStateMachine with State closed.
   pub fn new(
     bytes_assembled: Sender<u8>,
@@ -173,6 +181,7 @@ impl TcpStateMachineWorker {
       access_termination_signal: control_signal_tx,
       reassembler,
       terminating: false,
+      send_buffer: Vec::new(),
     }
   }
   /// The state transition function
@@ -181,7 +190,7 @@ impl TcpStateMachineWorker {
       self.state = match self.state {
         TcpState::SynSent => self.handle_syn_sent(),
         TcpState::SynReceived => todo!(),
-        TcpState::Established => todo!(),
+        TcpState::Established => self.handle_established(),
         TcpState::FinWait1 => todo!(),
         TcpState::FinWait2 => todo!(),
         TcpState::Closing => todo!(),
@@ -211,9 +220,8 @@ impl TcpStateMachineWorker {
 
   // The handle function for TcpState::SynSent
   fn handle_syn_sent(&mut self) -> TcpState {
-    const MAX_RETRY_COUNT: usize = 5;
     let mut retry_count = 0;
-    while retry_count < MAX_RETRY_COUNT {
+    while retry_count < Self::MAX_RETRY_COUNT {
       if let Ok((packet, addr)) = self.packet_received.recv_timeout(Self::ESTIMATE_RTT) {
         // Check if the packet is sync-ack
         if addr == self.dest_addr.unwrap()
@@ -237,7 +245,6 @@ impl TcpStateMachineWorker {
           return TcpState::Established;
         }
       }
-
       // Receive shutdown signal. We have not select to use.
       if let Ok(signal) = self.control_signal.try_recv() {
         match signal {
@@ -260,6 +267,7 @@ impl TcpStateMachineWorker {
   }
 
   fn handle_established(&mut self) -> TcpState {
+    let mut retry_times = 0;
     loop {
       // Check close/terminate
       if let Ok(signal) = self.control_signal.try_recv() {
@@ -274,11 +282,18 @@ impl TcpStateMachineWorker {
           _ => (),
         }
       }
-
-      if self.receive_data() {
-        return TcpState::CloseWait;
-      }
+      let data_receive_result = self.receive_data();
       self.send_data(false);
+      match data_receive_result {
+        Ok(true) => {
+          return TcpState::CloseWait;
+        }
+        Ok(false) => retry_times = 0,
+        Err(()) => retry_times += 1,
+      }
+      if retry_times > Self::MAX_RETRY_COUNT {
+        return TcpState::Closed;
+      }
     }
   }
 
@@ -324,37 +339,56 @@ impl TcpStateMachineWorker {
     }
   }
 
-  // Return true if fin
-  fn receive_data(&mut self) -> bool {
+  // Return Ok(true) if fin, Ok(false) if not fin. Return Err(()) if timeout
+  fn receive_data(&mut self) -> Result<bool, ()> {
     // Receive the data
-    while let Ok((packet, addr)) = self.packet_received.try_recv() {
+    if let Ok((packet, addr)) = self.packet_received.recv_timeout(Self::ESTIMATE_RTT) {
       // Wrong packet send here
-      if addr != self.src_addr {
-        continue;
+      if addr == self.src_addr {
+        // Update the send sequence
+        if packet.flags & TcpFlags::ACK != 0 {
+          // Update the buffer
+          for _ in 0..self.send_seq.update(WrappingInt32::new(packet.acknowledgement)) {
+            self.send_buffer.pop();
+          }
+        }
+        // Get the data
+        let ack_delta = self.reassembler.update(
+          packet.payload,
+          WrappingInt32::unwrap(
+            WrappingInt32::new(packet.sequence),
+            self.recv_seq.unwrap().initial_state_number,
+            self.recv_seq.unwrap().absolute_seqence_number,
+          ),
+        );
+        // Update recv seq
+        self.recv_seq.unwrap().add(ack_delta);
+        if packet.flags & TcpFlags::FIN != 0 {
+          return Ok(true);
+        }
+        // Update peer window
+        self.peer_window_size = packet.window;
       }
-      // Update the send sequence
-      if packet.flags & TcpFlags::ACK != 0 {
-        self.send_seq.update(WrappingInt32::new(packet.acknowledgement));
-      }
-      // Get the data
-      let ack_delta = self.reassembler.update(
-        packet.payload,
-        WrappingInt32::unwrap(
-          WrappingInt32::new(packet.sequence),
-          self.recv_seq.unwrap().initial_state_number,
-          self.recv_seq.unwrap().absolute_seqence_number,
-        ),
-      );
-      self.recv_seq.unwrap().add(ack_delta);
-      if packet.flags & TcpFlags::FIN != 0 {
-        return true;
-      }
+      return Ok(false);
     }
-    false
+    Err(())
   }
 
   fn send_data(&mut self, send_fin: bool) {
-    let mut send_buffer: Vec<u8> = Vec::new();
     // Prepare the data
+    while self.send_buffer.len() < self.peer_window_size as usize && self.send_buffer.len() < Self::MAX_DATA_LENGTH {
+      if let Ok(byte) = self.bytes_to_send.try_recv() {
+        self.send_buffer.push(byte);
+      } else {
+        break;
+      }
+    }
+    self
+      .packet_to_send
+      .send((
+        self.pack_data(self.send_buffer.clone(), send_fin),
+        self.dest_addr.unwrap(),
+      ))
+      .unwrap();
   }
 }
