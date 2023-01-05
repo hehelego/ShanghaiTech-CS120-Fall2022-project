@@ -191,7 +191,7 @@ impl TcpStateMachineWorker {
         TcpState::SynSent => self.handle_syn_sent(),
         TcpState::SynReceived => self.handle_syn_rcvd(),
         TcpState::Established => self.handle_established(),
-        TcpState::FinWait1 => todo!(),
+        TcpState::FinWait1 => self.handle_fin_wait1(),
         TcpState::FinWait2 => todo!(),
         TcpState::Closing => todo!(),
         TcpState::CloseWait => todo!(),
@@ -334,6 +334,33 @@ impl TcpStateMachineWorker {
     }
   }
 
+  fn handle_fin_wait1(&mut self) -> TcpState {
+    let mut fin_received = false;
+    let mut retry_count = 0;
+    while !self.send_buffer.is_empty() {
+      self.send_data(true);
+      match self.receive_data() {
+        Ok(true) => {
+          retry_count = 0;
+          fin_received = true;
+        }
+        Ok(false) => {
+          retry_count = 0;
+        }
+        Err(_) => {
+          retry_count += 1;
+        }
+      }
+      if retry_count > Self::MAX_RETRY_COUNT {
+        return TcpState::Closed;
+      }
+    }
+    if fin_received {
+      TcpState::Closing
+    } else {
+      TcpState::FinWait2
+    }
+  }
   // Pack a sync packet
   fn pack_sync(&self) -> Tcp {
     let mut packet = self.pack_vanilla();
@@ -347,7 +374,7 @@ impl TcpStateMachineWorker {
     packet.flags = TcpFlags::ACK;
     packet
   }
-
+  // Pack a sync_ack packet
   fn pack_sync_ack(&self) -> Tcp {
     let mut packet = self.pack_vanilla();
     packet.flags = TcpFlags::ACK | TcpFlags::SYN;
@@ -363,7 +390,7 @@ impl TcpStateMachineWorker {
     packet
   }
 
-  // Pack a packet without any flag and payload
+  /// Pack a packet without any flag and payload
   fn pack_vanilla(&self) -> Tcp {
     Tcp {
       source: self.src_addr.port(),
@@ -381,7 +408,7 @@ impl TcpStateMachineWorker {
     }
   }
 
-  // Return Ok(true) if fin, Ok(false) if not fin. Return Err(()) if timeout
+  /// Return Ok(true) if fin, Ok(false) if not fin. Return Err(()) if timeout
   fn receive_data(&mut self) -> Result<bool, ()> {
     // Receive the data
     if let Ok((packet, addr)) = self.packet_received.recv_timeout(Self::ESTIMATE_RTT) {
@@ -416,13 +443,8 @@ impl TcpStateMachineWorker {
         break;
       }
     }
-    self
-      .packet_to_send
-      .send((
-        self.pack_data(self.send_buffer.clone(), send_fin),
-        self.dest_addr.unwrap(),
-      ))
-      .unwrap();
+    let packet = self.pack_data(self.send_buffer.clone(), send_fin && self.bytes_to_send.is_empty());
+    self.packet_to_send.send((packet, self.dest_addr.unwrap())).unwrap();
   }
 
   fn update_data(&mut self, data: Vec<u8>, sequence: u32) {
