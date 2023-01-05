@@ -22,6 +22,7 @@ enum TcpState {
   Closing,
   CloseWait,
   LastAck,
+  TimeWait,
   Closed,
   Terminate,
 }
@@ -192,12 +193,13 @@ impl TcpStateMachineWorker {
         TcpState::SynReceived => self.handle_syn_rcvd(),
         TcpState::Established => self.handle_established(),
         TcpState::FinWait1 => self.handle_fin_wait1(),
-        TcpState::FinWait2 => todo!(),
+        TcpState::FinWait2 => self.handle_fin_wait2(),
         TcpState::Closing => todo!(),
         TcpState::CloseWait => todo!(),
         TcpState::LastAck => todo!(),
         TcpState::Closed => self.handle_closed(),
         TcpState::Terminate => break,
+        TcpState::TimeWait => todo!(),
       };
     }
   }
@@ -333,11 +335,11 @@ impl TcpStateMachineWorker {
       }
     }
   }
-
+  // The handle function for TcpState::FinWait1
   fn handle_fin_wait1(&mut self) -> TcpState {
     let mut fin_received = false;
     let mut retry_count = 0;
-    while !self.send_buffer.is_empty() {
+    while !fin_received && !self.send_buffer.is_empty() {
       self.send_data(true);
       match self.receive_data() {
         Ok(true) => {
@@ -352,15 +354,36 @@ impl TcpStateMachineWorker {
         }
       }
       if retry_count > Self::MAX_RETRY_COUNT {
-        return TcpState::Closed;
+        return TcpState::Terminate;
       }
     }
-    if fin_received {
+    if fin_received && self.bytes_to_send.is_empty() && self.send_buffer.is_empty() {
+      TcpState::TimeWait
+    } else if fin_received {
       TcpState::Closing
     } else {
       TcpState::FinWait2
     }
   }
+
+  fn handle_fin_wait2(&mut self) -> TcpState {
+    let mut retry_times = 0;
+    loop {
+      self.send_ack();
+      match self.receive_data() {
+        Ok(true) => return TcpState::TimeWait,
+        Ok(false) => retry_times = 0,
+        Err(_) => {
+          self.send_ack();
+          retry_times += 1;
+        }
+      }
+      if retry_times > Self::MAX_RETRY_COUNT {
+        return TcpState::Terminate;
+      }
+    }
+  }
+
   // Pack a sync packet
   fn pack_sync(&self) -> Tcp {
     let mut packet = self.pack_vanilla();
@@ -445,6 +468,13 @@ impl TcpStateMachineWorker {
     }
     let packet = self.pack_data(self.send_buffer.clone(), send_fin && self.bytes_to_send.is_empty());
     self.packet_to_send.send((packet, self.dest_addr.unwrap())).unwrap();
+  }
+
+  fn send_ack(&mut self) {
+    self
+      .packet_to_send
+      .send((self.pack_ack(), self.dest_addr.unwrap()))
+      .unwrap();
   }
 
   fn update_data(&mut self, data: Vec<u8>, sequence: u32) {
