@@ -205,7 +205,7 @@ impl TcpStateMachineWorker {
         TcpState::FinWait2 => self.handle_fin_wait2(),
         TcpState::Closing => self.handle_closing(),
         TcpState::CloseWait => self.handle_close_wait(),
-        TcpState::LastAck => todo!(),
+        TcpState::LastAck => self.handle_last_ack(),
         TcpState::Closed => self.handle_closed(),
         TcpState::Terminate => break,
         TcpState::TimeWait => todo!(),
@@ -433,7 +433,7 @@ impl TcpStateMachineWorker {
         }
         _ => (),
       }
-      self.send_ack();
+      self.send_data(false);
       match self.receive_ack() {
         Ok(_) => retry_times = 0,
         Err(_) => retry_times += 1,
@@ -442,6 +442,25 @@ impl TcpStateMachineWorker {
     TcpState::Terminate
   }
 
+  /// Function for TcpState::LastAck
+  fn handle_last_ack(&mut self) -> TcpState {
+    let mut retry_times = 0;
+    while retry_times < Self::MAX_RETRY_COUNT {
+      self.send_data(true);
+      match self.receive_ack() {
+        Ok(_) => {
+          if self.send_buffer.is_empty() && self.bytes_to_send.is_empty() {
+            return TcpState::Closed;
+          }
+          retry_times = 0;
+        }
+        Err(_) => {
+          retry_times += 1;
+        }
+      }
+    }
+    TcpState::Terminate
+  }
   // Pack a sync packet
   fn pack_sync(&self) -> Tcp {
     let mut packet = self.pack_vanilla();
