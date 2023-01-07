@@ -207,8 +207,8 @@ impl TcpStateMachineWorker {
         TcpState::CloseWait => self.handle_close_wait(),
         TcpState::LastAck => self.handle_last_ack(),
         TcpState::Closed => self.handle_closed(),
+        TcpState::TimeWait => self.handle_time_wait(),
         TcpState::Terminate => break,
-        TcpState::TimeWait => todo!(),
       };
     }
   }
@@ -460,6 +460,17 @@ impl TcpStateMachineWorker {
       }
     }
     TcpState::Terminate
+  }
+
+  /// Function for TcpState::TimeWait
+  fn handle_time_wait(&mut self) -> TcpState {
+    loop {
+      self.send_ack();
+      match self.receive_data() {
+        Err(_) => return TcpState::Closed,
+        _ => (),
+      }
+    }
   }
   // Pack a sync packet
   fn pack_sync(&self) -> Tcp {
