@@ -1,14 +1,9 @@
 use super::super::ASockProtocol;
 use super::wrapping_integers::WrappingInt32;
-use crate::{packet, IpAccessor};
-use crossbeam_channel::{select, Receiver, Sender};
+use crate::IpAccessor;
+use crossbeam_channel::{Receiver, Sender};
 use pnet::packet::tcp::{Tcp, TcpFlags};
-use std::{
-  net::SocketAddrV4,
-  thread,
-  time::{Duration, Instant},
-  usize,
-};
+use std::{net::SocketAddrV4, thread, time::Duration, usize};
 
 use super::StateControlSignal;
 
@@ -72,7 +67,8 @@ struct Reassembler {
   buffer: Vec<Option<u8>>,
   buffer_header: usize,
   capacity: usize,
-  output: Sender<u8>,
+  output: Option<Sender<u8>>,
+  fin_byte: Option<usize>,
 }
 
 impl Reassembler {
@@ -81,7 +77,8 @@ impl Reassembler {
       buffer: vec![None; capacity],
       buffer_header: 1,
       capacity,
-      output,
+      output: Some(output),
+      fin_byte: None,
     }
   }
 
@@ -91,7 +88,10 @@ impl Reassembler {
 
   /// Push new data into the reassmebler and send to the client
   /// Return the bytes send to the client
-  pub fn update(&mut self, data: Vec<u8>, pos: u64) -> u32 {
+  pub fn update(&mut self, data: Vec<u8>, pos: u64, fin: bool) -> u32 {
+    if fin {
+      self.fin_byte = Some(pos as usize + data.len());
+    }
     let mut bytes_sent = 0;
     let (data_start, buffer_start) = if (pos as usize) < self.buffer_header {
       ((self.buffer_header - pos as usize), 0)
@@ -107,14 +107,23 @@ impl Reassembler {
     }
     for i in (self.buffer_header..self.capacity).chain(0..self.buffer_header) {
       if let Some(byte) = self.buffer[i].take() {
-        self.output.send(byte).unwrap();
-        self.buffer_header = (self.buffer_header + 1) % self.capacity;
-        bytes_sent += 1;
+        if let Some(output) = self.output.as_ref() {
+          output.send(byte).unwrap();
+          self.buffer_header = (self.buffer_header + 1) % self.capacity;
+          bytes_sent += 1;
+        }
       } else {
         break;
       }
     }
+    if self.fin_byte.map_or(false, |v| self.buffer_header > v) {
+      drop(self.output.take());
+    }
     bytes_sent
+  }
+
+  pub fn is_fin(&self) -> bool {
+    self.output.is_none()
   }
 }
 
@@ -195,7 +204,7 @@ impl TcpStateMachineWorker {
         TcpState::FinWait1 => self.handle_fin_wait1(),
         TcpState::FinWait2 => self.handle_fin_wait2(),
         TcpState::Closing => self.handle_closing(),
-        TcpState::CloseWait => todo!(),
+        TcpState::CloseWait => self.handle_close_wait(),
         TcpState::LastAck => todo!(),
         TcpState::Closed => self.handle_closed(),
         TcpState::Terminate => break,
@@ -288,7 +297,7 @@ impl TcpStateMachineWorker {
           self.send_seq.step();
           self.peer_window_size = packet.window;
           // Get data
-          self.update_data(packet.payload, packet.sequence);
+          self.update_data(packet.payload, packet.sequence, packet.flags);
           self.send_data(false);
           return TcpState::Established;
         }
@@ -394,7 +403,7 @@ impl TcpStateMachineWorker {
     }
   }
 
-  /// Function for TcpState::CLOSING
+  /// Function for TcpState::Closing
   fn handle_closing(&mut self) -> TcpState {
     let mut retry_times = 0;
     while !self.bytes_to_send.is_empty() || !self.send_buffer.is_empty() {
@@ -408,6 +417,29 @@ impl TcpStateMachineWorker {
       }
     }
     TcpState::TimeWait
+  }
+
+  /// Function for TcpState::CloseWait
+  fn handle_close_wait(&mut self) -> TcpState {
+    let mut retry_times = 0;
+    while retry_times < Self::MAX_RETRY_COUNT {
+      match self.control_signal.try_recv() {
+        Ok(StateControlSignal::Shutdown) => {
+          return TcpState::LastAck;
+        }
+        Ok(StateControlSignal::Terminate) => {
+          self.terminating = true;
+          return TcpState::LastAck;
+        }
+        _ => (),
+      }
+      self.send_ack();
+      match self.receive_ack() {
+        Ok(_) => retry_times = 0,
+        Err(_) => retry_times += 1,
+      }
+    }
+    TcpState::Terminate
   }
 
   // Pack a sync packet
@@ -471,8 +503,8 @@ impl TcpStateMachineWorker {
           }
         }
         // Get the data
-        self.update_data(packet.payload, packet.sequence);
-        if packet.flags & TcpFlags::FIN != 0 {
+        self.update_data(packet.payload, packet.sequence, packet.flags);
+        if self.reassembler.is_fin() {
           return Ok(true);
         }
         // Update peer window
@@ -523,8 +555,9 @@ impl TcpStateMachineWorker {
       .unwrap();
   }
 
-  fn update_data(&mut self, data: Vec<u8>, sequence: u32) {
+  fn update_data(&mut self, data: Vec<u8>, sequence: u32, flags: u16) {
     // Get the data
+    let fin_flag = flags & TcpFlags::FIN != 0;
     let ack_delta = self.reassembler.update(
       data,
       WrappingInt32::unwrap(
@@ -532,6 +565,7 @@ impl TcpStateMachineWorker {
         self.recv_seq.unwrap().initial_state_number,
         self.recv_seq.unwrap().absolute_seqence_number,
       ),
+      fin_flag,
     );
     // Update recv seq
     self.recv_seq.unwrap().add(ack_delta);
