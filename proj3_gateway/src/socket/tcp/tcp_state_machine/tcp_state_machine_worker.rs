@@ -208,7 +208,10 @@ impl TcpStateMachineWorker {
         TcpState::LastAck => self.handle_last_ack(),
         TcpState::Closed => self.handle_closed(),
         TcpState::TimeWait => self.handle_time_wait(),
-        TcpState::Terminate => break,
+        TcpState::Terminate => {
+          self.access_termination_signal.send(()).unwrap();
+          break;
+        }
       };
     }
   }

@@ -43,6 +43,7 @@ impl TcpStateMachine {
 impl Drop for TcpStateMachine {
   // Gracefully shutdown
   fn drop(&mut self) {
+    self.control_signal.send(StateControlSignal::Terminate).unwrap();
     if let Some(thread) = self.join_handler.take() {
       thread.join().unwrap();
     }
