@@ -9,10 +9,12 @@ struct Cli {
 }
 
 fn main() {
+  env_logger::init();
   let Cli { src_port, dest_addr } = Cli::parse();
   // Initialize socket.
   let self_addr: SocketAddrV4 = SocketAddrV4::new(Ipv4Addr::new(192, 168, 1, 2), src_port);
-  let tcp_stream = TcpStream::bind(self_addr).unwrap();
+  let mut tcp_stream = TcpStream::bind(self_addr).unwrap();
+  tcp_stream.connect(dest_addr).unwrap();
 
   // Read data
   let data_lines = std::fs::read("INPUT.txt").unwrap();
