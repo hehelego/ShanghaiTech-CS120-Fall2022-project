@@ -33,6 +33,7 @@ impl TcpStateMachine {
     }
   }
   pub fn connect(&self, dest: SocketAddrV4) -> Result<(), ()> {
+    log::debug!("[Tcp Machine] connect");
     self.control_signal.send(StateControlSignal::Sync(dest)).map_err(|_| ())
   }
   pub fn shutdown(&self) -> Result<(), ()> {

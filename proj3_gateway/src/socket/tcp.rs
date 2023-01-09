@@ -28,6 +28,7 @@ impl TcpStream {
     // Create the Tcp State Machine
     let state_machine = TcpStateMachine::new(bytes_assembled_tx, bytes_to_send_rx, addr);
     // Tcp StateMachine
+    log::debug!("[Tcp Stream] bind to {}", addr);
     Ok(Self {
       bytes_to_send: bytes_to_send_tx,
       bytes_assembled: bytes_assmebled_rx,
@@ -50,7 +51,7 @@ impl TcpStream {
   /// Connect the TcpStream to a remote address.
   /// Return Error if connections timeout.
   pub fn connect(&mut self, dest: SocketAddrV4) -> Result<(), ()> {
-    const HAND_SHAKE_MAX_TIME: Duration = Duration::from_secs(6);
+    const HAND_SHAKE_MAX_TIME: Duration = Duration::from_secs(30);
     self.state_machine.connect(dest)?;
     self
       .bytes_assembled

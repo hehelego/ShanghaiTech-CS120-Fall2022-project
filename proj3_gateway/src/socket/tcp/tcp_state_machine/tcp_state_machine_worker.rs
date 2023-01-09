@@ -8,6 +8,7 @@ use std::{net::SocketAddrV4, thread, time::Duration, usize};
 use super::StateControlSignal;
 
 /// States for the TcpStateMachine
+#[derive(Debug)]
 enum TcpState {
   SynSent,
   SynReceived,
@@ -75,7 +76,7 @@ impl Reassembler {
   pub fn with_capacity(output: Sender<u8>, capacity: usize) -> Self {
     Self {
       buffer: vec![None; capacity],
-      buffer_header: 1,
+      buffer_header: 0,
       capacity,
       output: Some(output),
       fin_byte: None,
@@ -122,6 +123,12 @@ impl Reassembler {
     bytes_sent
   }
 
+  pub fn sync(&mut self) {
+    self.buffer_header += 1;
+    if let Some(output) = self.output.as_ref() {
+      output.send(0).unwrap();
+    }
+  }
   pub fn is_fin(&self) -> bool {
     self.output.is_none()
   }
@@ -147,7 +154,7 @@ pub(super) struct TcpStateMachineWorker {
 }
 
 impl TcpStateMachineWorker {
-  const ESTIMATE_RTT: Duration = Duration::from_secs(1);
+  const ESTIMATE_RTT: Duration = Duration::from_secs(6);
   const MAX_DATA_LENGTH: usize = 1024;
   const MAX_RETRY_COUNT: usize = 5;
   /// Create a new TcpStateMachine with State closed.
@@ -163,7 +170,7 @@ impl TcpStateMachineWorker {
     let (packet_to_send_tx, packet_to_send_rx) = crossbeam_channel::unbounded();
 
     thread::spawn(move || {
-      let path = format!("/tmp/tcp_clinet_{}", src_addr);
+      let path = format!("/tmp/tcp_client_{}", src_addr);
       let accessor = IpAccessor::new(&path).unwrap();
       accessor.bind(ASockProtocol::TCP, src_addr).unwrap();
       while control_signal_rx.is_empty() {
@@ -177,6 +184,7 @@ impl TcpStateMachineWorker {
     });
 
     let reassembler = Reassembler::with_capacity(bytes_assembled, WINDOW_SIZE);
+    log::debug!("[Tcp Worker] created. src_addr: {}", src_addr);
     Self {
       send_seq: Seq::new(),
       state: TcpState::Closed,
@@ -196,6 +204,7 @@ impl TcpStateMachineWorker {
   }
   /// The state transition function
   pub(crate) fn run(&mut self) {
+    log::debug!("[Tcp Worker] start run. state: {:?}", self.state);
     loop {
       self.state = match self.state {
         TcpState::SynSent => self.handle_syn_sent(),
@@ -214,15 +223,18 @@ impl TcpStateMachineWorker {
         }
       };
     }
+    log::debug!("[Tcp Worker] worker terminate");
   }
   // The handle function for TcpState::Closed
   fn handle_closed(&mut self) -> TcpState {
+    log::debug!("[Tcp Worker] state CLOSED");
     if self.terminating {
       return TcpState::Terminate;
     }
     match self.control_signal.recv().unwrap() {
       // Active open
       StateControlSignal::Sync(dest_addr) => {
+        log::debug!("[Tcp Worker] sync {}", dest_addr);
         self.dest_addr = Some(dest_addr);
         self.packet_to_send.send((self.pack_sync(), dest_addr)).unwrap();
         TcpState::SynSent
@@ -234,12 +246,23 @@ impl TcpStateMachineWorker {
 
   // The handle function for TcpState::SynSent
   fn handle_syn_sent(&mut self) -> TcpState {
+    log::debug!("[Tcp Worker] SynSent");
     let mut retry_count = 0;
     while retry_count < Self::MAX_RETRY_COUNT {
       if let Ok((packet, addr)) = self.packet_received.recv_timeout(Self::ESTIMATE_RTT) {
         // Check if the packet is sync-ack
-        if addr == self.src_addr
-          && packet.flags & TcpFlags::SYN != 0
+        println!(
+          "self addr: {}, packet addr: {}\n
+        is SYN-ACK: {},\n
+        self seq: {}, packet ack:{}\n
+        ",
+          self.src_addr,
+          addr,
+          packet.flags & TcpFlags::SYN != 0 && packet.flags & TcpFlags::ACK != 0,
+          self.send_seq.next(),
+          packet.acknowledgement
+        );
+        if packet.flags & TcpFlags::SYN != 0
           && packet.flags & TcpFlags::ACK != 0
           && packet.acknowledgement == self.send_seq.next()
         {
@@ -256,10 +279,12 @@ impl TcpStateMachineWorker {
             .packet_to_send
             .send((self.pack_ack(), self.dest_addr.unwrap()))
             .unwrap();
+          self.reassembler.sync();
+          log::debug!("[TCP] worker enter established");
           return TcpState::Established;
         }
       }
-      // Receive shutdown signal. We have not select to use.
+      // If no data to send, check if the host tell us to shutdown.
       if let Ok(signal) = self.control_signal.try_recv() {
         match signal {
           // receive closed
@@ -277,7 +302,8 @@ impl TcpStateMachineWorker {
       retry_count += 1
     }
     // Connection establish failed
-    TcpState::Closed
+    log::debug!("[Tcp Worker] Sync failed.");
+    TcpState::Terminate
   }
 
   // The handle function for TcpState::SynRcvd
