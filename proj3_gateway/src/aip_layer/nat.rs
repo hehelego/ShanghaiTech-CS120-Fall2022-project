@@ -239,12 +239,12 @@ impl IpLayerGateway {
         }
       }
       Ok(ASockProtocol::TCP) => {
-        if let Some(mut tcp) = parse_udp(&ipv4) {
+        if let Some(mut tcp) = parse_tcp(&ipv4) {
           // TCP NAT: change source port
           let inet_port = self.nat.find_or_add(tcp.source);
           tcp.source = inet_port;
           // TCP NAT: change source address
-          let ipv4 = compose_udp(&tcp, self.inet_self_ip, ipv4.destination);
+          let ipv4 = compose_tcp(&tcp, self.inet_self_ip, ipv4.destination);
           // compose function should recompute checksum
           let _ = self.rawsock.send(ipv4);
 
