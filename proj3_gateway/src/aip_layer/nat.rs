@@ -194,11 +194,11 @@ fn icmp_can_pass(icmp: &Icmp) -> bool {
 }
 
 /// Add iptables rules to prevent kernel from terminating TCP connection established by RAW socket
-fn drop_kernel_rst(sport: u16, dport: u16) {
-  // iptables -t filter -I OUTPUT -p tcp --sport 19260817 --dport 6666 --tcp-flags RST RST -j DROP
+fn drop_kernel_rst(dport: u16) {
+  // iptables -t filter -I OUTPUT -p tcp --dport 6666 --tcp-flags RST RST -j DROP
   // See <https://github.com/ermaoCode/raw_socket_connection>
   std::process::Command::new("iptables")
-    .args(format!("-t filter -I OUTPUT -p tcp --sport {sport} --dport {dport} --tcp-flags RST RST -j DROP").split(' '))
+    .args(format!("-t filter -I OUTPUT -p tcp --dport {dport} --tcp-flags RST RST -j DROP").split(' '))
     .spawn()
     .unwrap();
 }
@@ -255,13 +255,13 @@ impl IpLayerGateway {
           let inet_port = self.nat.find_or_add(tcp.source);
           tcp.source = inet_port;
           // prevent kernel from terminating the connection
-          drop_kernel_rst(inet_port, tcp.destination);
+          drop_kernel_rst(tcp.destination);
           // TCP NAT: change source address
           let ipv4 = compose_tcp(&tcp, self.inet_self_ip, ipv4.destination);
           // compose function should recompute checksum
           let _ = self.rawsock.send(ipv4);
 
-          log::debug!("forward A->I TCP, inet_port={}", inet_port);
+          log::debug!("forward A->I TCP, inet_port={}, seq={}", inet_port, tcp.sequence);
         }
       }
       Err(_) => {
