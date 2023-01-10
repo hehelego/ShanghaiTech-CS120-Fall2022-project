@@ -191,10 +191,8 @@ impl IpAccessor {
   /// Send a TCP packet via the network layer.
   pub fn send_tcp(&self, packet: Tcp, dest: SocketAddrV4) -> Result<()> {
     let ipv4 = compose_tcp(&packet, self.bind_addr(), *dest.ip());
-    // log::debug!("[Ip Accessor]: compose successfully");
     let send_req = Request::SendPacket(ipv4.into());
     send_packet(&self.ipc, &aip_ipc_sockaddr(), &send_req);
-    // log::debug!("[Ip Accessor]: send packet successfully");
     Ok(())
   }
   /// Receive a TCP packet from the network layer.

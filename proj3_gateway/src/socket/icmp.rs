@@ -10,7 +10,6 @@ use std::{
   cell::RefCell,
   io::Result,
   net::{Ipv4Addr, SocketAddrV4},
-  sync::mpsc::RecvTimeoutError,
   time::{Duration, Instant},
 };
 

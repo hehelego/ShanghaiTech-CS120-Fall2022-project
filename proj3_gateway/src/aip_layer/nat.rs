@@ -124,6 +124,7 @@ impl NatTable {
   }
   /// remove a NAT port mapping
   /// TODO: remove a mapping if no packet send/recv in the last minute.
+  #[allow(unused)]
   fn remove(&mut self, anet_port: u16, inet_port: u16) -> bool {
     if self.find_a2i(anet_port) != Some(inet_port) || self.find_i2a(inet_port) != Some(anet_port) {
       false

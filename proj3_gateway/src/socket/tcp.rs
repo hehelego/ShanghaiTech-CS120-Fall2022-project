@@ -1,5 +1,5 @@
-//! The tcp API. This module provide two types of the tcp socket: TcpStream and TcpListner.
-//! TcpStream is used for client and TcpListner is for the server.
+//! The tcp API. This module provide two types of the tcp socket: TcpStream and TcpListener.
+//! TcpStream is used for client and TcpListener is for the server.
 
 use crossbeam_channel::{Receiver, Sender};
 use std::{
@@ -36,7 +36,7 @@ impl TcpStream {
     })
   }
 
-  // This function is for TcpListner.
+  /// TCP TcpListener control transfer for accepting connections
   pub(self) fn transfer(
     bytes_to_send: Sender<u8>,
     bytes_assembled: Receiver<u8>,
