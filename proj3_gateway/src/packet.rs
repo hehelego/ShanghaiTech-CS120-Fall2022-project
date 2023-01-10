@@ -70,8 +70,8 @@ pub(crate) fn compose_udp(udp: &Udp, src: Ipv4Addr, dest: Ipv4Addr) -> Ipv4 {
 
 /// compose an IPv4 packet which encapsulates an TCP packet
 pub(crate) fn compose_tcp(tcp: &Tcp, src: Ipv4Addr, dest: Ipv4Addr) -> Ipv4 {
-  // 20: TCP header, with no extra options. 4 bit per option.
-  let mut buf = vec![0; 20 + tcp.payload.len() + 4 * tcp.data_offset as usize];
+  // 4 bit per option, min(data_offset)=5
+  let mut buf = vec![0; tcp.payload.len() + 4 * tcp.data_offset as usize];
   let mut tcp_pack = MutableTcpPacket::new(&mut buf).unwrap();
   tcp_pack.populate(tcp);
   tcp_pack.set_checksum(tcp_checksum(&tcp_pack.to_immutable(), &src, &dest));

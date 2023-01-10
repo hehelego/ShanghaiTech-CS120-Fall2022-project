@@ -176,6 +176,7 @@ pub struct IpLayerGateway {
   nat: NatTable,
 }
 
+/// Examine if an incomming ICMP packet from Internet should be send into Athernet
 fn icmp_can_pass(icmp: &Icmp) -> bool {
   if icmp.icmp_type == IcmpTypes::EchoReply {
     true
@@ -190,6 +191,16 @@ fn icmp_can_pass(icmp: &Icmp) -> bool {
   } else {
     false
   }
+}
+
+/// Add iptables rules to prevent kernel from terminating TCP connection established by RAW socket
+fn drop_kernel_rst(dport: u16) {
+  // iptables -t filter -I OUTPUT -p tcp --dport 6666 --tcp-flags RST RST -j DROP
+  // See <https://github.com/ermaoCode/raw_socket_connection>
+  std::process::Command::new("iptables")
+    .args(format!("-t filter -I OUTPUT -p tcp --dport {dport} --tcp-flags RST RST -j DROP").split(' '))
+    .spawn()
+    .unwrap();
 }
 
 /// The destination of a packet send to gateway is
@@ -239,16 +250,18 @@ impl IpLayerGateway {
         }
       }
       Ok(ASockProtocol::TCP) => {
-        if let Some(mut tcp) = parse_udp(&ipv4) {
+        if let Some(mut tcp) = parse_tcp(&ipv4) {
           // TCP NAT: change source port
           let inet_port = self.nat.find_or_add(tcp.source);
           tcp.source = inet_port;
+          // prevent kernel from terminating the connection
+          drop_kernel_rst(tcp.destination);
           // TCP NAT: change source address
-          let ipv4 = compose_udp(&tcp, self.inet_self_ip, ipv4.destination);
+          let ipv4 = compose_tcp(&tcp, self.inet_self_ip, ipv4.destination);
           // compose function should recompute checksum
           let _ = self.rawsock.send(ipv4);
 
-          log::debug!("forward A->I TCP, inet_port={}", inet_port);
+          log::debug!("forward A->I TCP, inet_port={}, seq={}", inet_port, tcp.sequence);
         }
       }
       Err(_) => {

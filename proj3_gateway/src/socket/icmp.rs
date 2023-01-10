@@ -10,6 +10,8 @@ use std::{
   cell::RefCell,
   io::Result,
   net::{Ipv4Addr, SocketAddrV4},
+  sync::mpsc::RecvTimeoutError,
+  time::{Duration, Instant},
 };
 
 /// A socket for sending/receiving ICMP packets
@@ -21,7 +23,7 @@ pub struct IcmpSocket {
 impl IcmpSocket {
   pub const PROTOCOL: ASockProtocol = ASockProtocol::ICMP;
   pub fn bind(addr: Ipv4Addr) -> Result<Self> {
-    let ipc_path = &(format!("icmp_{}", addr));
+    let ipc_path = &(format!("/tmp/icmp_{}", addr));
     let accessor = IpAccessor::new(ipc_path)?;
     accessor.bind(ASockProtocol::ICMP, SocketAddrV4::new(addr, 0))?;
     Ok(Self {
@@ -54,8 +56,9 @@ impl IcmpSocket {
     self.send(icmp, dest)
   }
   /// wait for an ICMP echo response from `from`
-  pub fn recv_pong(&self, id: u16, seq: u16, from: Ipv4Addr) -> Result<Vec<u8>> {
-    loop {
+  pub fn recv_pong_timeout(&self, id: u16, seq: u16, from: Ipv4Addr, duration: Duration) -> Result<Vec<u8>> {
+    let start = Instant::now();
+    while start.elapsed() < duration {
       if let Ok((icmp, src)) = self.ip_sock.recv_icmp() {
         if src != from {
           continue;
@@ -65,9 +68,10 @@ impl IcmpSocket {
         let pack = IcmpPacket::new(&buf).unwrap();
         let echo_reply = EchoReplyPacket::new(pack.packet()).unwrap().from_packet();
         if echo_reply.identifier == id && echo_reply.sequence_number == seq {
-          break Ok(echo_reply.payload);
+          return Ok(echo_reply.payload);
         }
       }
     }
+    Err(std::io::ErrorKind::TimedOut.into())
   }
 }

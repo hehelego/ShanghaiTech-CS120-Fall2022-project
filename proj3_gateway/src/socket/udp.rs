@@ -14,7 +14,7 @@ impl UdpSocket {
   pub const PROTOCOL: ASockProtocol = ASockProtocol::UDP;
   pub const MAX_PAYLOAD_LEN: usize = u16::MAX as usize;
   pub fn bind(addr: SocketAddrV4) -> Result<Self> {
-    let path = format!("udp_client_{}", addr);
+    let path = format!("/tmp/udp_client_{}", addr);
     let accessor = IpAccessor::new(&path)?;
     accessor.bind(Self::PROTOCOL, addr)?;
     Ok(Self { accessor, addr })
