@@ -19,6 +19,7 @@ fn send_packet_once<T: Serialize>(socket: &Socket, addr: &SockAddr, packet: &T) 
   log::trace!("IPC socket try to send a packet");
   let packet = serde_json::to_vec(packet)?;
   socket.send_to(&packet, addr)?;
+  // log::debug!("send packekt of size {}", packet.len());
   Ok(())
 }
 pub(crate) fn send_packet<T: Serialize>(socket: &Socket, addr: &SockAddr, packet: &T) {
@@ -32,6 +33,7 @@ pub(crate) fn recv_packet<T: DeserializeOwned>(socket: &Socket) -> Result<T> {
   log::trace!("IPC socket try to receive a packet",);
   let mut recv_buf = vec![mem::MaybeUninit::zeroed(); IPC_PACK_SIZE];
   let (n, _) = socket.recv_from(&mut recv_buf)?;
+  log::debug!("IPC socket received a packet",);
   let buf = recv_buf[..n]
     .iter()
     .map(|x| unsafe { mem::transmute(*x) })

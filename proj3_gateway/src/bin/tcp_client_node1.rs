@@ -1,6 +1,8 @@
 use clap::Parser;
 use proj3_gateway::TcpStream;
 use std::net::{Ipv4Addr, SocketAddrV4};
+use std::thread;
+use std::time::Duration;
 
 #[derive(Parser)]
 struct Cli {
@@ -23,6 +25,7 @@ fn main() {
     Ok(size) => println!("Send {} bytes", size),
     Err(_) => println!("Send data error"),
   }
+  thread::sleep(Duration::from_secs(10));
   match tcp_stream.shutdown() {
     Ok(_) => println!("Send data finished, tcp stream shutdown"),
     Err(_) => println!("Unable to shutdown the tcp stream"),

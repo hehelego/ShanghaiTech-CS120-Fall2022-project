@@ -2,7 +2,7 @@ use socket2::SockAddr;
 use std::time::Duration;
 
 /// Time to wait before unix domain socket IPC retry
-pub const IPC_RETRY_WAIT: Duration = Duration::from_millis(10);
+pub const IPC_RETRY_WAIT: Duration = Duration::from_millis(50);
 
 /// Maximum packet size for IPC packet send over unix domain socket
 pub const IPC_PACK_SIZE: usize = 4096;
