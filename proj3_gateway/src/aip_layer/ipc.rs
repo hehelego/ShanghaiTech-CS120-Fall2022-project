@@ -15,14 +15,10 @@ use std::{
   thread::sleep,
 };
 
-fn send_packet_once<T: Serialize>(socket: &Socket, addr: &SockAddr, packet: &T) -> Result<()> {
-  log::trace!("IPC socket try to send a packet");
-  let packet = serde_json::to_vec(packet)?;
-  socket.send_to(&packet, addr)?;
-  Ok(())
-}
 pub(crate) fn send_packet<T: Serialize>(socket: &Socket, addr: &SockAddr, packet: &T) {
-  while send_packet_once(socket, addr, packet).is_err() {
+  let mut send_buf = [0; IPC_PACK_SIZE];
+  let packet = postcard::to_slice(packet, &mut send_buf).unwrap();
+  while socket.send_to(packet, addr).is_err() {
     sleep(IPC_RETRY_WAIT);
     log::trace!("IPC packet send retry");
   }
@@ -30,13 +26,13 @@ pub(crate) fn send_packet<T: Serialize>(socket: &Socket, addr: &SockAddr, packet
 
 pub(crate) fn recv_packet<T: DeserializeOwned>(socket: &Socket) -> Result<T> {
   log::trace!("IPC socket try to receive a packet",);
-  let mut recv_buf = vec![mem::MaybeUninit::zeroed(); IPC_PACK_SIZE];
+  let mut recv_buf = [mem::MaybeUninit::zeroed(); IPC_PACK_SIZE];
   let (n, _) = socket.recv_from(&mut recv_buf)?;
   let buf = recv_buf[..n]
     .iter()
     .map(|x| unsafe { mem::transmute(*x) })
     .collect::<Vec<u8>>();
-  serde_json::from_slice(&buf).map_err(|_| ErrorKind::InvalidData.into())
+  postcard::from_bytes(&buf).map_err(|_| ErrorKind::InvalidData.into())
 }
 
 pub(crate) fn extract_ip_pack(response: Response) -> Result<Ipv4> {
