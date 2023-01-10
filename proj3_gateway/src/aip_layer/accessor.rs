@@ -30,13 +30,6 @@ impl Worker {
     while exit_rx.try_recv().is_err() {
       if let Ok(resp) = recv_packet(&ipc) {
         if let Ok(ipv4) = extract_ip_pack(resp) {
-          // let protocol: ASockProtocol = ipv4.next_level_protocol.try_into().unwrap();
-          // log::debug!(
-          //   "IP accessor got a {:?} packet {:?}->{:?} from IP provider",
-          //   protocol,
-          //   ipv4.source,
-          //   ipv4.destination
-          // );
           pack_tx.send(ipv4).unwrap();
         }
       }
@@ -208,9 +201,7 @@ impl IpAccessor {
   /// The TCP representation packet and the source address are returned.
   pub fn recv_tcp(&self) -> Result<(Tcp, SocketAddrV4)> {
     let ipv4 = self.recv_ipv4()?;
-    // log::debug!("[Accessor]: get ipv4 packet");
     let tcp = parse_tcp(&ipv4).ok_or(ErrorKind::InvalidData)?;
-    // log::debug!("[Accessor]: parse tcp successfully");
     let src_addr = SocketAddrV4::new(ipv4.source, tcp.source);
     Ok((tcp, src_addr))
   }

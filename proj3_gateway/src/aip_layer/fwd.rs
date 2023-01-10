@@ -154,9 +154,7 @@ impl IpLayerInternal {
   }
 
   fn mainloop(&mut self) {
-    // log::debug!("[Ip] send poll");
     self.ip_txrx.send_poll();
-    // log::debug!("[Ip] recv poll");
     let maybe_ipv4 = self.ip_txrx.recv_poll();
     // on receiving IPv4 packet from peer
     if let Some(ipv4) = maybe_ipv4 {
@@ -164,7 +162,6 @@ impl IpLayerInternal {
       self.on_recv_ipv4(ipv4);
     }
 
-    // log::debug!("[Ip] collect job");
     // handling requests: bind socket & send packet
     if let Ok(request) = recv_packet::<Request>(&self.ipc) {
       match request {
