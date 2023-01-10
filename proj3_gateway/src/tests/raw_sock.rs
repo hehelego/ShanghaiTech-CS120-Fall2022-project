@@ -16,8 +16,8 @@ use std::{
 };
 
 const PACK_SIZE: usize = 4096;
-const SRC_ADDR: Ipv4Addr = Ipv4Addr::new(192, 168, 18, 103);
-const DEST_ADDR: Ipv4Addr = Ipv4Addr::new(13, 107, 21, 200);
+const SRC_ADDR: Ipv4Addr = Ipv4Addr::new(127, 0, 0, 1);
+const DEST_ADDR: Ipv4Addr = Ipv4Addr::new(127, 0, 0, 1);
 
 struct RawSock {
   send_buf: [u8; PACK_SIZE],

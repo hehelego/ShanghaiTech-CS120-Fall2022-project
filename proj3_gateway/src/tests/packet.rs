@@ -54,7 +54,7 @@ fn tcp_once() {
     destination: rng.gen(),
     sequence: rng.gen(),
     acknowledgement: rng.gen(),
-    data_offset: 0,
+    data_offset: 5,
     reserved: 0,
     flags: 0,
     window: rng.gen(),
