@@ -192,7 +192,7 @@ pub(super) struct TcpStateMachineWorker {
 
 impl TcpStateMachineWorker {
   const ESTIMATE_RTT: Duration = Duration::from_secs(2);
-  const MAX_DATA_LENGTH: usize = 512;
+  const MAX_DATA_LENGTH: usize = 1024;
   const MAX_RETRY_COUNT: usize = 5;
   /// Create a new TcpStateMachine with State closed.
   pub fn new(
@@ -461,26 +461,13 @@ impl TcpStateMachineWorker {
       self.send_data(true);
       match self.receive_data() {
         Ok(true) => {
-          log::debug!(
-            "[Tcp Worker] FinWait1 received fin.\n
-          old peer seq: {}
-          ",
-            self.recv_seq.unwrap().absolute_seqence_number
-          );
           retry_count = 0;
           if !fin_received {
             self.recv_seq.as_mut().unwrap().step()
           }
-          log::debug!(
-            "[Tcp Worker] FinWait1 received fin.\n
-          peer seq: {}
-          ",
-            self.recv_seq.unwrap().absolute_seqence_number
-          );
           fin_received = true;
         }
         Ok(false) => {
-          log::debug!("[Tcp Worker] FinWait1 received data");
           retry_count = 0;
         }
         Err(_) => {
