@@ -8,4 +8,4 @@ mod icmp;
 pub use icmp::IcmpSocket;
 
 mod tcp;
-pub use tcp::TcpSocket;
+pub use tcp::{TcpListener, TcpStream};

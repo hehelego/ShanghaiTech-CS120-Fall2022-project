@@ -7,7 +7,7 @@ pub use aip_layer::{IpAccessor, IpLayerGateway, IpLayerInternal};
 
 /// Transport layer socket API built on Athernet
 mod socket;
-pub use socket::{ASockProtocol, IcmpSocket, TcpSocket, UdpSocket};
+pub use socket::{ASockProtocol, IcmpSocket, TcpListener, TcpStream, UdpSocket};
 
 /// Define common constant values: timeout length, maximum packet size ...
 mod common;

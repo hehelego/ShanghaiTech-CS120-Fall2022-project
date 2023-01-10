@@ -28,6 +28,7 @@ pub(crate) fn recv_packet<T: DeserializeOwned>(socket: &Socket) -> Result<T> {
   log::trace!("IPC socket try to receive a packet",);
   let mut recv_buf = [mem::MaybeUninit::zeroed(); IPC_PACK_SIZE];
   let (n, _) = socket.recv_from(&mut recv_buf)?;
+  log::debug!("IPC socket received a packet",);
   let buf = recv_buf[..n]
     .iter()
     .map(|x| unsafe { mem::transmute(*x) })

@@ -1,6 +1,6 @@
 use crate::{
   aip_layer::ipc::{extract_ip_pack, recv_packet, send_packet, Request, Response},
-  common::{aip_ipc_sockaddr, IPC_TIMEOUT, IPC_RETRY_WAIT},
+  common::{aip_ipc_sockaddr, IPC_RETRY_WAIT, IPC_TIMEOUT},
   packet::{compose_icmp, compose_tcp, compose_udp, parse_icmp, parse_tcp, parse_udp},
   ASockProtocol,
 };
@@ -12,7 +12,7 @@ use std::{
   io::{ErrorKind, Result},
   net::{Ipv4Addr, SocketAddrV4},
   sync::Arc,
-  thread::{spawn, JoinHandle, sleep},
+  thread::{sleep, spawn, JoinHandle},
 };
 
 use super::ipc::IpcPath;
@@ -30,11 +30,6 @@ impl Worker {
     while exit_rx.try_recv().is_err() {
       if let Ok(resp) = recv_packet(&ipc) {
         if let Ok(ipv4) = extract_ip_pack(resp) {
-          log::debug!(
-            "IP accessor got a packet {:?}->{:?} from IP provider",
-            ipv4.source,
-            ipv4.destination
-          );
           pack_tx.send(ipv4).unwrap();
         }
       }
@@ -115,10 +110,10 @@ impl IpAccessor {
     // communicate with provider to bind
     let bind_request = Request::BindSocket(self.ipc_path.clone(), sock_type, sock_addr);
     send_packet(&self.ipc, &aip_ipc_sockaddr(), &bind_request);
-    let bind_response = loop{
-      if let Ok(resp) = recv_packet(&self.ipc){
+    let bind_response = loop {
+      if let Ok(resp) = recv_packet(&self.ipc) {
         break resp;
-      }else {
+      } else {
         sleep(IPC_RETRY_WAIT);
       }
     };
@@ -158,13 +153,17 @@ impl IpAccessor {
     self.worker.borrow().as_ref().expect("recv on an unbind socket").recv()
   }
 
-  fn bind_addr(&self) -> Ipv4Addr{
-    self.bind_addr.borrow().expect("request local address of an unbind socket")
+  fn bind_addr(&self) -> Ipv4Addr {
+    self
+      .bind_addr
+      .borrow()
+      .expect("request local address of an unbind socket")
   }
 }
 
 impl Drop for IpAccessor {
   fn drop(&mut self) {
+    log::info!("drop accessor");
     let _ = self.unbind();
   }
 }
