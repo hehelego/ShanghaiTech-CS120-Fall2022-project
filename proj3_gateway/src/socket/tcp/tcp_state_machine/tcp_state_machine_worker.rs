@@ -109,7 +109,7 @@ impl Reassembler {
   /// Return the bytes send to the client
   pub fn update(&mut self, data: &[u8], pos: u64, fin: bool) -> u32 {
     if fin {
-      self.fin_byte = Some(pos as usize + data.len());
+      self.fin_byte = Some(pos as usize + data.len() - 1);
     }
     let mut bytes_sent = 0;
     let (data_start, buffer_start) = if (pos as usize) < self.buffer_header {
@@ -123,38 +123,38 @@ impl Reassembler {
       data_start,
       buffer_start
     );
-    if data_start >= data.len() {
-      return 0;
-    }
-    // Buffer the data
-    for (bi, d) in (buffer_start..self.capacity)
-      .chain(0..buffer_start)
-      .zip(data[data_start..].iter().cloned())
-    {
-      self.buffer[bi] = Some(d)
-    }
-    for i in (self.buffer_header % self.capacity..self.capacity).chain(0..self.buffer_header) {
-      if let Some(byte) = self.buffer[i].take() {
-        if let Some(output) = self.output.as_ref() {
-          match output.send(byte) {
-            Ok(_) => (),
-            Err(e) => panic!("output error: {}", e),
+    if data_start < data.len() {
+      // Buffer the data
+      for (bi, d) in (buffer_start..self.capacity)
+        .chain(0..buffer_start)
+        .zip(data[data_start..].iter().cloned())
+      {
+        self.buffer[bi] = Some(d)
+      }
+      for i in (self.buffer_header % self.capacity..self.capacity).chain(0..self.buffer_header) {
+        if let Some(byte) = self.buffer[i].take() {
+          if let Some(output) = self.output.as_ref() {
+            match output.send(byte) {
+              _ => (),
+            }
+            self.buffer_header += 1;
+            bytes_sent += 1;
           }
-          self.buffer_header += 1;
-          bytes_sent += 1;
+        } else {
+          break;
         }
-      } else {
-        break;
       }
     }
     if self.fin_byte.map_or(false, |v| self.buffer_header > v) {
       drop(self.output.take());
     }
     log::debug!(
-      "[Reassmbler]: data len: {}, byte_reassembled: {}, header_pos: {}",
+      "[Reassmbler]: Update \n
+      data len: {}, byte_reassembled: {}, header_pos: {}, is_fin: {}",
       data.len(),
       bytes_sent,
-      self.buffer_header
+      self.buffer_header,
+      self.output.is_none()
     );
     bytes_sent
   }
@@ -192,7 +192,7 @@ pub(super) struct TcpStateMachineWorker {
 
 impl TcpStateMachineWorker {
   const ESTIMATE_RTT: Duration = Duration::from_secs(2);
-  const MAX_DATA_LENGTH: usize = 64;
+  const MAX_DATA_LENGTH: usize = 512;
   const MAX_RETRY_COUNT: usize = 5;
   /// Create a new TcpStateMachine with State closed.
   pub fn new(
@@ -201,7 +201,7 @@ impl TcpStateMachineWorker {
     control_signal: Receiver<StateControlSignal>,
     src_addr: SocketAddrV4,
   ) -> TcpStateMachineWorker {
-    const WINDOW_SIZE: usize = 50;
+    const WINDOW_SIZE: usize = TcpStateMachineWorker::MAX_DATA_LENGTH;
     let (control_signal_tx, control_signal_rx) = crossbeam_channel::unbounded();
     let (packet_received_tx, packet_received_rx) = crossbeam_channel::unbounded();
     let (packet_to_send_tx, packet_to_send_rx) = crossbeam_channel::unbounded();
@@ -229,7 +229,7 @@ impl TcpStateMachineWorker {
           Err(e) => match e {
             TryRecvError::Empty => (),
             TryRecvError::Disconnected => {
-              log::debug!("accessor disconnected");
+              // log::debug!("accessor disconnected");
             }
           },
         }
@@ -390,7 +390,7 @@ impl TcpStateMachineWorker {
           self.send_seq.step();
           self.peer_window_size = packet.window;
           // Get data
-          self.update_data(&packet.payload[20..], packet.sequence, packet.flags);
+          self.update_data(&packet.payload, packet.sequence, packet.flags);
           self.send_data(false);
           return TcpState::Established;
         }
@@ -432,6 +432,7 @@ impl TcpStateMachineWorker {
       self.send_data(false);
       match data_receive_result {
         Ok(true) => {
+          self.recv_seq.as_mut().unwrap().step();
           return TcpState::CloseWait;
         }
         Ok(false) => retry_times = 0,
@@ -456,12 +457,26 @@ impl TcpStateMachineWorker {
     );
     let mut fin_received = false;
     let mut retry_count = 0;
-    while !fin_received && (!self.send_buffer.is_empty() || !self.bytes_to_send.is_empty()) {
+    while !fin_received || !self.send_buffer.is_empty() || !self.bytes_to_send.is_empty() {
       self.send_data(true);
       match self.receive_data() {
         Ok(true) => {
-          log::debug!("[Tcp Worker] FinWait1 received fin");
+          log::debug!(
+            "[Tcp Worker] FinWait1 received fin.\n
+          old peer seq: {}
+          ",
+            self.recv_seq.unwrap().absolute_seqence_number
+          );
           retry_count = 0;
+          if !fin_received {
+            self.recv_seq.as_mut().unwrap().step()
+          }
+          log::debug!(
+            "[Tcp Worker] FinWait1 received fin.\n
+          peer seq: {}
+          ",
+            self.recv_seq.unwrap().absolute_seqence_number
+          );
           fin_received = true;
         }
         Ok(false) => {
@@ -498,7 +513,10 @@ impl TcpStateMachineWorker {
     loop {
       self.send_ack();
       match self.receive_data() {
-        Ok(true) => return TcpState::TimeWait,
+        Ok(true) => {
+          self.recv_seq.as_mut().unwrap().step();
+          return TcpState::TimeWait;
+        }
         Ok(false) => retry_times = 0,
         Err(_) => {
           self.send_ack();
@@ -666,8 +684,8 @@ impl TcpStateMachineWorker {
         packet.flags & TcpFlags::RST,
         packet.flags & TcpFlags::FIN,
         packet.data_offset,
-        packet.payload.len() - 20,
-        String::from_utf8_lossy(&packet.payload[..packet.payload.len() - 20])
+        packet.payload.len(),
+        String::from_utf8_lossy(&packet.payload)
       );
       if packet.flags & TcpFlags::ACK != 0 {
         // Update the buffer
@@ -676,11 +694,7 @@ impl TcpStateMachineWorker {
         }
       }
       // Get the data
-      self.update_data(
-        &packet.payload[..packet.payload.len() - 20],
-        packet.sequence,
-        packet.flags,
-      );
+      self.update_data(&packet.payload, packet.sequence, packet.flags);
       if self.reassembler.is_fin() {
         return Ok(true);
       }
@@ -731,12 +745,14 @@ impl TcpStateMachineWorker {
     let packet = self.pack_data(self.send_buffer.clone(), send_fin && self.bytes_to_send.is_empty());
     log::debug!(
       "[Tcp Worker] Send packet to {},\n
-      seq = {}, ack = {}, len = {}
+      seq = {}, ack = {}, len = {}\n
+      FIN: {}
       ",
       self.dest_addr.unwrap(),
       packet.sequence,
       packet.acknowledgement,
-      packet.payload.len()
+      packet.payload.len(),
+      packet.flags & TcpFlags::FIN
     );
     self.packet_to_send.send((packet, self.dest_addr.unwrap())).unwrap();
     log::debug!("[Tcp Worker] Packet sent successfully",);
@@ -768,5 +784,10 @@ impl TcpStateMachineWorker {
     );
     // Update recv seq
     self.recv_seq.unwrap().add(ack_delta);
+    log::debug!(
+      "Peer seq update: \n
+        {}",
+      self.recv_seq.unwrap().absolute_seqence_number,
+    )
   }
 }

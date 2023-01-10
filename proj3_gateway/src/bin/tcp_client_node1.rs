@@ -25,7 +25,6 @@ fn main() {
     Ok(size) => println!("Send {} bytes", size),
     Err(_) => println!("Send data error"),
   }
-  thread::sleep(Duration::from_secs(10));
   match tcp_stream.shutdown() {
     Ok(_) => println!("Send data finished, tcp stream shutdown"),
     Err(_) => println!("Unable to shutdown the tcp stream"),
