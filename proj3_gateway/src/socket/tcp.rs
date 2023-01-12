@@ -72,7 +72,7 @@ impl TcpStream {
 
   /// Try to read data to buf. Wait for at most `timeout` time. If `timeout` is None, the function is blocking.
   /// Returns the length of data read on success.
-  pub fn read_timeout(&self, buf: &mut [u8], timeout: Option<Duration>) -> Result<usize, ()> {
+  pub fn read_timeout(&self, buf: &mut [u8], timeout: Option<Duration>) -> (usize, bool) {
     let mut bytes_read = 0;
     if let Some(timeout) = timeout {
       let deadline = Instant::now() + timeout;
@@ -82,7 +82,10 @@ impl TcpStream {
             bytes_read += 1;
             *x = byte
           }
-          Err(_) => return Ok(bytes_read),
+          Err(e) => match e {
+            crossbeam_channel::RecvTimeoutError::Timeout => return (bytes_read, false),
+            crossbeam_channel::RecvTimeoutError::Disconnected => return (bytes_read, true),
+          },
         }
       }
     } else {
@@ -93,11 +96,11 @@ impl TcpStream {
             *x = byte;
             bytes_read += 1;
           }
-          Err(_) => return Ok(bytes_read),
+          Err(_) => return (bytes_read, true),
         }
       }
     }
-    Ok(bytes_read)
+    (bytes_read, false)
   }
 
   /// Try to write data from buf. Wait for at most `timeout` time. If `timeout` is None, the function is blocking.
