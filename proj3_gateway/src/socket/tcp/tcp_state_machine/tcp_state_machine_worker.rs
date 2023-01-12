@@ -258,6 +258,38 @@ impl TcpStateMachineWorker {
       accessor_handler: Some(accessor_handler),
     }
   }
+
+  pub fn with_sync(
+    src_addr: SocketAddrV4,
+    dest_addr: SocketAddrV4,
+    sync_pack: Tcp,
+    bytes_assembled: Sender<u8>,
+    packet_to_send: Sender<(Tcp, SocketAddrV4)>,
+    packet_received: Receiver<(Tcp, SocketAddrV4)>,
+    bytes_to_send: Receiver<u8>,
+    control_signal: Receiver<StateControlSignal>,
+    access_termination_signal: Sender<()>,
+  ) -> Self {
+    let mut recv_seq = Seq::with_u32(sync_pack.sequence);
+    recv_seq.step();
+    Self {
+      src_addr,
+      dest_addr: Some(dest_addr),
+      send_seq: Seq::new(),
+      recv_seq: Some(recv_seq),
+      state: TcpState::SynReceived,
+      peer_window_size: sync_pack.window,
+      reassembler: Reassembler::with_capacity(bytes_assembled, TcpStateMachineWorker::MAX_DATA_LENGTH),
+      send_buffer: Vec::new(),
+      packet_to_send,
+      packet_received,
+      bytes_to_send,
+      control_signal,
+      access_termination_signal,
+      terminating: false,
+      accessor_handler: None,
+    }
+  }
   /// The state transition function
   pub(crate) fn run(&mut self) {
     log::debug!("[Tcp Worker] start run. state: {:?}", self.state);
@@ -374,18 +406,24 @@ impl TcpStateMachineWorker {
   fn handle_syn_rcvd(&mut self) -> TcpState {
     let mut retry_count = 0;
     while retry_count < Self::MAX_RETRY_COUNT {
-      match self.control_signal.try_recv() {
-        Ok(StateControlSignal::Shutdown) => return TcpState::FinWait1,
-        Ok(StateControlSignal::Terminate) => {
-          self.terminating = true;
-          return TcpState::FinWait1;
+      // send sync-ack
+      self
+        .packet_to_send
+        .send((self.pack_sync_ack(), self.dest_addr.unwrap()))
+        .unwrap();
+      if self.bytes_to_send.is_empty() {
+        match self.control_signal.try_recv() {
+          Ok(StateControlSignal::Shutdown) => return TcpState::FinWait1,
+          Ok(StateControlSignal::Terminate) => {
+            self.terminating = true;
+            return TcpState::FinWait1;
+          }
+          _ => (),
         }
-        _ => (),
-      };
-      if let Ok((packet, addr)) = self.packet_received.recv_timeout(Self::ESTIMATE_RTT) {
+      }
+      if let Ok((packet, _)) = self.packet_received.recv_timeout(Self::ESTIMATE_RTT) {
         // check if it is ack
-        if addr == self.src_addr && packet.flags & TcpFlags::ACK != 0 && packet.acknowledgement == self.send_seq.next()
-        {
+        if packet.flags & TcpFlags::ACK != 0 && packet.acknowledgement == self.send_seq.next() {
           // increase seq
           self.send_seq.step();
           self.peer_window_size = packet.window;
@@ -394,13 +432,6 @@ impl TcpStateMachineWorker {
           self.send_data(false);
           return TcpState::Established;
         }
-        // If not, just neglect.
-      } else {
-        // resend sync-ack
-        self
-          .packet_to_send
-          .send((self.pack_sync_ack(), self.dest_addr.unwrap()))
-          .unwrap();
         retry_count += 1;
       }
     }
