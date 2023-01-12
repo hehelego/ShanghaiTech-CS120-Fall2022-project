@@ -1295,6 +1295,13 @@ dependencies = [
 [[package]]
 name = "proj4_ftp"
 version = "0.1.0"
+dependencies = [
+ "clap 4.0.26",
+ "env_logger",
+ "log",
+ "proj3_gateway",
+ "rand",
+]
 
 [[package]]
 name = "quote"
