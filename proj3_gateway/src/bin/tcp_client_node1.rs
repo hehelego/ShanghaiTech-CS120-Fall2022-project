@@ -1,8 +1,6 @@
 use clap::Parser;
 use proj3_gateway::TcpStream;
 use std::net::{Ipv4Addr, SocketAddrV4};
-use std::thread;
-use std::time::Duration;
 
 #[derive(Parser)]
 struct Cli {
