@@ -88,6 +88,7 @@ struct Reassembler {
   capacity: usize,
   output: Option<Sender<u8>>,
   fin_byte: Option<usize>,
+  is_fin: bool,
 }
 
 impl Reassembler {
@@ -98,6 +99,7 @@ impl Reassembler {
       capacity,
       output: Some(output),
       fin_byte: None,
+      is_fin: false,
     }
   }
 
@@ -108,6 +110,9 @@ impl Reassembler {
   /// Push new data into the reassmebler and send to the client
   /// Return the bytes send to the client
   pub fn update(&mut self, data: &[u8], pos: u64, fin: bool) -> u32 {
+    if self.is_fin {
+      return 0;
+    }
     if fin {
       self.fin_byte = Some(pos as usize + data.len() - 1);
     }
@@ -118,7 +123,9 @@ impl Reassembler {
       (0, (pos as usize - self.buffer_header))
     };
     log::debug!(
-      "[Reassmbler]: data len: {}, data start:{}, buffer_start: {}",
+      "[Reassmbler]: pos: {}, buffer_header: {}, data len: {}, data start:{}, buffer_start: {}",
+      pos,
+      self.buffer_header,
       data.len(),
       data_start,
       buffer_start
@@ -129,16 +136,14 @@ impl Reassembler {
         .chain(0..buffer_start)
         .zip(data[data_start..].iter().cloned())
       {
-        self.buffer[bi] = Some(d)
+        self.buffer[(self.buffer_header + bi) % self.capacity] = Some(d)
       }
       for i in (self.buffer_header % self.capacity..self.capacity).chain(0..self.buffer_header) {
         if let Some(byte) = self.buffer[i].take() {
+          self.buffer_header += 1;
+          bytes_sent += 1;
           if let Some(output) = self.output.as_ref() {
-            match output.send(byte) {
-              _ => (),
-            }
-            self.buffer_header += 1;
-            bytes_sent += 1;
+            let _ = output.send(byte);
           }
         } else {
           break;
@@ -146,6 +151,7 @@ impl Reassembler {
       }
     }
     if self.fin_byte.map_or(false, |v| self.buffer_header > v) {
+      self.is_fin = true;
       drop(self.output.take());
     }
     log::debug!(
@@ -165,11 +171,17 @@ impl Reassembler {
       output.send(0).unwrap();
     }
   }
-  pub fn set_fin(&mut self) {
-    drop(self.output.take())
+
+  pub fn ack(&mut self) {
+    self.buffer_header += 1;
+  }
+  pub fn set_down(&mut self) {
+    if let Some(o) = self.output.take() {
+      drop(o)
+    }
   }
   pub fn is_fin(&self) -> bool {
-    self.output.is_none()
+    self.is_fin
   }
 }
 
@@ -279,6 +291,8 @@ impl TcpStateMachineWorker {
   ) -> Self {
     let mut recv_seq = Seq::with_u32(sync_pack.sequence);
     recv_seq.step();
+    let mut reassembler = Reassembler::with_capacity(bytes_assembled, TcpStateMachineWorker::MAX_DATA_LENGTH);
+    reassembler.ack();
     Self {
       src_addr,
       dest_addr: Some(dest_addr),
@@ -286,7 +300,7 @@ impl TcpStateMachineWorker {
       recv_seq: Some(recv_seq),
       state: TcpState::SynReceived,
       peer_window_size: sync_pack.window,
-      reassembler: Reassembler::with_capacity(bytes_assembled, TcpStateMachineWorker::MAX_DATA_LENGTH),
+      reassembler,
       send_buffer: Vec::new(),
       packet_to_send,
       packet_received,
@@ -301,7 +315,7 @@ impl TcpStateMachineWorker {
   }
   /// The state transition function
   pub(crate) fn run(&mut self) {
-    log::debug!("[Tcp Worker] start run. state: {:?}", self.state);
+    log::info!("[Tcp Worker] start run. state: {:?}", self.state);
     loop {
       self.state = match self.state {
         TcpState::SynSent => self.handle_syn_sent(),
@@ -323,11 +337,11 @@ impl TcpStateMachineWorker {
         }
       };
     }
-    log::debug!("[Tcp Worker] worker terminate");
+    log::info!("[Tcp Worker] worker terminate");
   }
   // The handle function for TcpState::Closed
   fn handle_closed(&mut self) -> TcpState {
-    log::debug!(
+    log::info!(
       "[Tcp Worker] \n
      CLOSED"
     );
@@ -356,7 +370,7 @@ impl TcpStateMachineWorker {
 
   // The handle function for TcpState::SynSent
   fn handle_syn_sent(&mut self) -> TcpState {
-    log::debug!(
+    log::info!(
       "[Tcp Worker] \n
     SynSent"
     );
@@ -409,13 +423,13 @@ impl TcpStateMachineWorker {
       retry_count += 1
     }
     // Connection establish failed
-    log::debug!("[Tcp Worker] Sync failed.");
+    log::info!("[Tcp Worker] Sync failed.");
     TcpState::Terminate
   }
 
   // The handle function for TcpState::SynRcvd
   fn handle_syn_rcvd(&mut self) -> TcpState {
-    log::debug!(
+    log::info!(
       "[Tcp Worker] \n
     SynReceived"
     );
@@ -445,7 +459,7 @@ impl TcpStateMachineWorker {
 
   /// The handle function for TcpState::ESTABLISHED
   fn handle_established(&mut self) -> TcpState {
-    log::debug!(
+    log::info!(
       "[Tcp Worker]: \n
     Established"
     );
@@ -480,7 +494,7 @@ impl TcpStateMachineWorker {
   /// If we send all the data, and the same time we reive FIN from the peer, we enter TIME_WAIT.
   /// If we send all the data, and the peer still have data to send, we enter FIN_WAIT2.
   fn handle_fin_wait1(&mut self) -> TcpState {
-    log::debug!(
+    log::info!(
       "[Tcp Worker]: \n
     FinWait1"
     );
@@ -521,7 +535,7 @@ impl TcpStateMachineWorker {
   /// In this state, we have sent all of our data, and we wait for the peer to finish its transmission.
   /// After receive FIN from the peer, we enter TIME_WAIT.
   fn handle_fin_wait2(&mut self) -> TcpState {
-    log::debug!(
+    log::info!(
       "[Tcp Worker]: \n
     FinWait2"
     );
@@ -547,7 +561,7 @@ impl TcpStateMachineWorker {
 
   /// Function for TcpState::Closing
   fn handle_closing(&mut self) -> TcpState {
-    log::debug!(
+    log::info!(
       "[Tcp Worker]: \n
     Closing"
     );
@@ -567,7 +581,7 @@ impl TcpStateMachineWorker {
 
   /// Function for TcpState::CloseWait
   fn handle_close_wait(&mut self) -> TcpState {
-    log::debug!(
+    log::info!(
       "[Tcp Worker]: \n
     CloseWait"
     );
@@ -588,7 +602,7 @@ impl TcpStateMachineWorker {
 
   /// Function for TcpState::LastAck
   fn handle_last_ack(&mut self) -> TcpState {
-    log::debug!(
+    log::info!(
       "[Tcp Worker]: \n
     LastAck"
     );
@@ -612,7 +626,7 @@ impl TcpStateMachineWorker {
 
   /// Function for TcpState::TimeWait
   fn handle_time_wait(&mut self) -> TcpState {
-    log::debug!(
+    log::info!(
       "[Tcp Worker]: \n
     TimeWait"
     );
@@ -787,12 +801,8 @@ impl TcpStateMachineWorker {
     // Get the data
     let fin_flag = flags & TcpFlags::FIN != 0;
     // If client shutdown the read
-    if self.write_down {
-      if !self.reassembler.is_fin() {
-        self.reassembler.set_fin()
-      }
-      self.recv_seq.unwrap().add(data.len() as u32);
-      return;
+    if self.read_down {
+      self.reassembler.set_down();
     }
     let ack_delta = self.reassembler.update(
       data,
@@ -804,10 +814,11 @@ impl TcpStateMachineWorker {
       fin_flag,
     );
     // Update recv seq
-    self.recv_seq.unwrap().add(ack_delta);
+    self.recv_seq.as_mut().unwrap().add(ack_delta);
     log::debug!(
       "Peer seq update: \n
-        {}",
+        delat:{}, seq: {}",
+      ack_delta,
       self.recv_seq.unwrap().absolute_seqence_number,
     )
   }
