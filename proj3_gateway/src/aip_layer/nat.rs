@@ -225,9 +225,9 @@ impl IpLayerGateway {
           // UDP NAT: change source address
           let ipv4 = compose_udp(&udp, self.inet_self_ip, ipv4.destination);
           // compose function should recompute checksum
-          let _ = self.rawsock.send(ipv4);
+          let result = self.rawsock.send(ipv4);
 
-          log::debug!("forward A->I UDP, inet_port={}", inet_port);
+          log::debug!("forward A->I UDP, inet_port={}, result: {:?}", inet_port, result);
         }
       }
       Ok(ASockProtocol::ICMP) => {

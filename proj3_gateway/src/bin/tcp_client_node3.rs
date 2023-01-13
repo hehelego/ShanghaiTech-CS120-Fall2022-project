@@ -1,7 +1,7 @@
 use clap::Parser;
 use std::net::TcpStream;
 
-use std::io::prelude::*;
+use std::io::Write;
 #[derive(Parser)]
 struct Cli {
   /// The ip address.

@@ -1,4 +1,5 @@
 use crossbeam_channel::{Receiver, Sender};
+use pnet::packet::tcp::Tcp;
 use std::{
   net::SocketAddrV4,
   thread::{self, JoinHandle},
@@ -8,7 +9,8 @@ use tcp_state_machine_worker::TcpStateMachineWorker;
 /// Tcp control signal
 enum StateControlSignal {
   Sync(SocketAddrV4),
-  Shutdown,
+  ShutdownRead,
+  ShutdownWrite,
   Terminate,
 }
 
@@ -32,12 +34,56 @@ impl TcpStateMachine {
       control_signal: control_signal_tx,
     }
   }
+  /// Create a new state machine with state: SynReceived
+  pub fn syn_received(
+    src_addr: SocketAddrV4,
+    dest_addr: SocketAddrV4,
+    sync_pack: Tcp,
+    bytes_assembled: Sender<u8>,
+    packet_to_send: Sender<(Tcp, SocketAddrV4)>,
+    packet_received: Receiver<(Tcp, SocketAddrV4)>,
+    bytes_to_send: Receiver<u8>,
+    access_termination_signal: Sender<()>,
+  ) -> Self {
+    let (control_signal_tx, control_signal_rx) = crossbeam_channel::unbounded();
+    let handle = thread::spawn(move || {
+      let mut worker = TcpStateMachineWorker::with_sync(
+        src_addr,
+        dest_addr,
+        sync_pack,
+        bytes_assembled,
+        packet_to_send,
+        packet_received,
+        bytes_to_send,
+        control_signal_rx,
+        access_termination_signal,
+      );
+      worker.run();
+    });
+
+    Self {
+      join_handler: Some(handle),
+      control_signal: control_signal_tx,
+    }
+  }
+
   pub fn connect(&self, dest: SocketAddrV4) -> Result<(), ()> {
     log::debug!("[Tcp Machine] connect");
     self.control_signal.send(StateControlSignal::Sync(dest)).map_err(|_| ())
   }
-  pub fn shutdown(&self) -> Result<(), ()> {
-    self.control_signal.send(StateControlSignal::Shutdown).map_err(|_| ())
+
+  pub fn shutdown_read(&self) -> Result<(), ()> {
+    self
+      .control_signal
+      .send(StateControlSignal::ShutdownRead)
+      .map_err(|_| ())
+  }
+
+  pub fn shutdown_write(&self) -> Result<(), ()> {
+    self
+      .control_signal
+      .send(StateControlSignal::ShutdownWrite)
+      .map_err(|_| ())
   }
 }
 
