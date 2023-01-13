@@ -23,7 +23,7 @@ fn main() {
     Ok(size) => println!("Send {} bytes", size),
     Err(_) => println!("Send data error"),
   }
-  match tcp_stream.shutdown() {
+  match tcp_stream.shutdown_both() {
     Ok(_) => println!("Send data finished, tcp stream shutdown"),
     Err(_) => println!("Unable to shutdown the tcp stream"),
   }

@@ -66,8 +66,17 @@ impl TcpStream {
   }
 
   /// Shutdown the TcpStream
-  pub fn shutdown(&self) -> Result<(), ()> {
-    self.state_machine.shutdown()
+  pub fn shutdown_both(&self) -> Result<(), ()> {
+    self.state_machine.shutdown_read()?;
+    self.state_machine.shutdown_write()
+  }
+
+  pub fn shutdown_read(&self) -> Result<(), ()> {
+    self.state_machine.shutdown_read()
+  }
+
+  pub fn shutdown_write(&self) -> Result<(), ()> {
+    self.state_machine.shutdown_write()
   }
 
   /// Try to read data to buf. Wait for at most `timeout` time. If `timeout` is None, the function is blocking.
@@ -160,23 +169,25 @@ impl TcpListener {
   pub fn accept(&self) -> Result<(TcpStream, SocketAddrV4), ()> {
     let (bytes_to_send_tx, bytes_to_send_rx) = crossbeam_channel::unbounded();
     let (bytes_assembled_tx, bytes_assembled_rx) = crossbeam_channel::unbounded();
-    if let Ok((packet, addr, packet_to_send, packet_received, access_termination_signal)) =
-      self.pending_connection.try_recv()
-    {
-      let state_machine = TcpStateMachine::syn_received(
-        self.src_addr,
-        addr,
-        packet,
-        bytes_assembled_tx,
-        packet_to_send,  // receive from the channel
-        packet_received, // receive from the channel
-        bytes_to_send_rx,
-        access_termination_signal, // receive from the channel
-      );
-      let tcp_stream = TcpStream::transfer(bytes_to_send_tx, bytes_assembled_rx, state_machine);
-      Ok((tcp_stream, addr))
-    } else {
-      Err(())
+    match self.pending_connection.recv() {
+      Ok((packet, addr, packet_to_send, packet_received, access_termination_signal)) => {
+        let state_machine = TcpStateMachine::syn_received(
+          self.src_addr,
+          addr,
+          packet,
+          bytes_assembled_tx,
+          packet_to_send,  // receive from the channel
+          packet_received, // receive from the channel
+          bytes_to_send_rx,
+          access_termination_signal, // receive from the channel
+        );
+        let tcp_stream = TcpStream::transfer(bytes_to_send_tx, bytes_assembled_rx, state_machine);
+        Ok((tcp_stream, addr))
+      }
+      Err(e) => {
+        log::debug!("[Listener] Accept error: {}", e);
+        Err(())
+      }
     }
   }
 }
@@ -215,9 +226,11 @@ impl TcpListenerWorker {
       Sender<()>,
     )>,
   ) -> Self {
-    let path = format!("TcpListener_{}", addr);
+    let path = format!("/tmp/tcp_listener_{}", addr);
     let accessor = IpAccessor::new(&path).unwrap();
+    accessor.bind(ASockProtocol::TCP, addr).unwrap();
     let hash_map = HashMap::new();
+    log::debug!("[Listener Worker] start");
     Self {
       terminate_signal_rx,
       packet_channel: crossbeam_channel::unbounded(),
@@ -238,6 +251,7 @@ impl TcpListenerWorker {
       // Clear up
       self.hash_map.retain(|_, v| v.1.try_recv().is_err())
     }
+    println!("[Listener Worker] end");
   }
   fn dispatch(&mut self, packet: Tcp, addr: SocketAddrV4) {
     if let Some((sender, signal)) = self.hash_map.get(&addr) {

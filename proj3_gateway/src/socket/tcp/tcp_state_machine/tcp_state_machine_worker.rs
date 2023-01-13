@@ -165,6 +165,9 @@ impl Reassembler {
       output.send(0).unwrap();
     }
   }
+  pub fn set_fin(&mut self) {
+    drop(self.output.take())
+  }
   pub fn is_fin(&self) -> bool {
     self.output.is_none()
   }
@@ -186,6 +189,8 @@ pub(super) struct TcpStateMachineWorker {
   control_signal: Receiver<StateControlSignal>, // signal from TcpStateMachine
   access_termination_signal: Sender<()>,       // terminate signale for the accessor
   // terminate statemachine
+  read_down: bool,
+  write_down: bool,
   terminating: bool,
   accessor_handler: Option<JoinHandle<()>>,
 }
@@ -256,6 +261,8 @@ impl TcpStateMachineWorker {
       terminating: false,
       send_buffer: Vec::new(),
       accessor_handler: Some(accessor_handler),
+      read_down: false,
+      write_down: false,
     }
   }
 
@@ -288,6 +295,8 @@ impl TcpStateMachineWorker {
       access_termination_signal,
       terminating: false,
       accessor_handler: None,
+      read_down: false,
+      write_down: false,
     }
   }
   /// The state transition function
@@ -334,7 +343,14 @@ impl TcpStateMachineWorker {
         TcpState::SynSent
       }
       StateControlSignal::Terminate => TcpState::Terminate,
-      _ => TcpState::Closed,
+      StateControlSignal::ShutdownRead => {
+        self.read_down = true;
+        TcpState::Closed
+      }
+      StateControlSignal::ShutdownWrite => {
+        self.write_down = true;
+        TcpState::Closed
+      }
     }
   }
 
@@ -348,7 +364,7 @@ impl TcpStateMachineWorker {
     while retry_count < Self::MAX_RETRY_COUNT {
       if let Ok((packet, addr)) = self.packet_received.recv_timeout(Self::ESTIMATE_RTT) {
         // Check if the packet is sync-ack
-        println!(
+        log::debug!(
           "self addr: {}, packet addr: {}\n
         is SYN-ACK: {},\n
         self seq: {}, packet ack:{}\n
@@ -381,14 +397,9 @@ impl TcpStateMachineWorker {
         }
       }
       // If no data to send, check if the host tell us to shutdown.
-      if let Ok(signal) = self.control_signal.try_recv() {
-        match signal {
-          // receive closed
-          StateControlSignal::Shutdown => return TcpState::Closed,
-          // terminate
-          StateControlSignal::Terminate => return TcpState::Terminate,
-          _ => (),
-        }
+      self.handle_control_signal();
+      if self.read_down && self.write_down {
+        return TcpState::Closed;
       }
 
       self
@@ -404,6 +415,10 @@ impl TcpStateMachineWorker {
 
   // The handle function for TcpState::SynRcvd
   fn handle_syn_rcvd(&mut self) -> TcpState {
+    log::debug!(
+      "[Tcp Worker] \n
+    SynReceived"
+    );
     let mut retry_count = 0;
     while retry_count < Self::MAX_RETRY_COUNT {
       // send sync-ack
@@ -411,16 +426,6 @@ impl TcpStateMachineWorker {
         .packet_to_send
         .send((self.pack_sync_ack(), self.dest_addr.unwrap()))
         .unwrap();
-      if self.bytes_to_send.is_empty() {
-        match self.control_signal.try_recv() {
-          Ok(StateControlSignal::Shutdown) => return TcpState::FinWait1,
-          Ok(StateControlSignal::Terminate) => {
-            self.terminating = true;
-            return TcpState::FinWait1;
-          }
-          _ => (),
-        }
-      }
       if let Ok((packet, _)) = self.packet_received.recv_timeout(Self::ESTIMATE_RTT) {
         // check if it is ack
         if packet.flags & TcpFlags::ACK != 0 && packet.acknowledgement == self.send_seq.next() {
@@ -429,7 +434,7 @@ impl TcpStateMachineWorker {
           self.peer_window_size = packet.window;
           // Get data
           self.update_data(&packet.payload, packet.sequence, packet.flags);
-          self.send_data(false);
+          self.send_data();
           return TcpState::Established;
         }
         retry_count += 1;
@@ -447,20 +452,13 @@ impl TcpStateMachineWorker {
     let mut retry_times = 0;
     loop {
       // Check close/terminate
-      if let Ok(signal) = self.control_signal.try_recv() {
-        match signal {
-          StateControlSignal::Shutdown => {
-            return TcpState::FinWait1;
-          }
-          StateControlSignal::Terminate => {
-            self.terminating = true;
-            return TcpState::FinWait1;
-          }
-          _ => (),
-        }
-      }
+      self.handle_control_signal();
+
       let data_receive_result = self.receive_data();
-      self.send_data(false);
+      self.send_data();
+      if self.write_down && self.bytes_to_send.is_empty() {
+        return TcpState::FinWait1;
+      }
       match data_receive_result {
         Ok(true) => {
           self.recv_seq.as_mut().unwrap().step();
@@ -488,8 +486,8 @@ impl TcpStateMachineWorker {
     );
     let mut fin_received = false;
     let mut retry_count = 0;
-    while !fin_received || !self.send_buffer.is_empty() || !self.bytes_to_send.is_empty() {
-      self.send_data(true);
+    while !fin_received && !self.send_buffer.is_empty() {
+      self.send_data();
       match self.receive_data() {
         Ok(true) => {
           retry_count = 0;
@@ -510,7 +508,7 @@ impl TcpStateMachineWorker {
         return TcpState::Terminate;
       }
     }
-    if fin_received && self.bytes_to_send.is_empty() && self.send_buffer.is_empty() {
+    if fin_received && self.send_buffer.is_empty() {
       TcpState::TimeWait
     } else if fin_received {
       TcpState::Closing
@@ -554,8 +552,8 @@ impl TcpStateMachineWorker {
     Closing"
     );
     let mut retry_times = 0;
-    while !self.bytes_to_send.is_empty() || !self.send_buffer.is_empty() {
-      self.send_data(true);
+    while !self.send_buffer.is_empty() {
+      self.send_data();
       match self.receive_ack() {
         Ok(_) => retry_times = 0,
         Err(_) => retry_times += 1,
@@ -575,17 +573,11 @@ impl TcpStateMachineWorker {
     );
     let mut retry_times = 0;
     while retry_times < Self::MAX_RETRY_COUNT {
-      match self.control_signal.try_recv() {
-        Ok(StateControlSignal::Shutdown) => {
-          return TcpState::LastAck;
-        }
-        Ok(StateControlSignal::Terminate) => {
-          self.terminating = true;
-          return TcpState::LastAck;
-        }
-        _ => (),
+      self.handle_control_signal();
+      if (self.write_down && self.bytes_to_send.is_empty()) || self.terminating {
+        return TcpState::LastAck;
       }
-      self.send_data(false);
+      self.send_data();
       match self.receive_ack() {
         Ok(_) => retry_times = 0,
         Err(_) => retry_times += 1,
@@ -602,10 +594,10 @@ impl TcpStateMachineWorker {
     );
     let mut retry_times = 0;
     while retry_times < Self::MAX_RETRY_COUNT {
-      self.send_data(true);
+      self.send_data();
       match self.receive_ack() {
         Ok(_) => {
-          if self.send_buffer.is_empty() && self.bytes_to_send.is_empty() {
+          if self.send_buffer.is_empty() {
             return TcpState::Closed;
           }
           retry_times = 0;
@@ -751,7 +743,7 @@ impl TcpStateMachineWorker {
     }
   }
 
-  fn send_data(&mut self, send_fin: bool) {
+  fn send_data(&mut self) {
     // Prepare the data
     while self.send_buffer.len() < self.peer_window_size as usize && self.send_buffer.len() < Self::MAX_DATA_LENGTH {
       if let Ok(byte) = self.bytes_to_send.try_recv() {
@@ -760,7 +752,10 @@ impl TcpStateMachineWorker {
         break;
       }
     }
-    let packet = self.pack_data(self.send_buffer.clone(), send_fin && self.bytes_to_send.is_empty());
+    let packet = self.pack_data(
+      self.send_buffer.clone(),
+      self.write_down && self.bytes_to_send.is_empty(),
+    );
     log::debug!(
       "[Tcp Worker] Send packet to {},\n
       seq = {}, ack = {}, len = {}\n
@@ -791,6 +786,14 @@ impl TcpStateMachineWorker {
   fn update_data(&mut self, data: &[u8], sequence: u32, flags: u16) {
     // Get the data
     let fin_flag = flags & TcpFlags::FIN != 0;
+    // If client shutdown the read
+    if self.write_down {
+      if !self.reassembler.is_fin() {
+        self.reassembler.set_fin()
+      }
+      self.recv_seq.unwrap().add(data.len() as u32);
+      return;
+    }
     let ack_delta = self.reassembler.update(
       data,
       WrappingInt32::unwrap(
@@ -807,5 +810,16 @@ impl TcpStateMachineWorker {
         {}",
       self.recv_seq.unwrap().absolute_seqence_number,
     )
+  }
+
+  fn handle_control_signal(&mut self) {
+    if let Ok(signal) = self.control_signal.try_recv() {
+      match signal {
+        StateControlSignal::ShutdownRead => self.read_down = true,
+        StateControlSignal::ShutdownWrite => self.write_down = true,
+        StateControlSignal::Terminate => self.terminating = true,
+        _ => (),
+      }
+    }
   }
 }

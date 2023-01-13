@@ -9,7 +9,8 @@ use tcp_state_machine_worker::TcpStateMachineWorker;
 /// Tcp control signal
 enum StateControlSignal {
   Sync(SocketAddrV4),
-  Shutdown,
+  ShutdownRead,
+  ShutdownWrite,
   Terminate,
 }
 
@@ -70,8 +71,19 @@ impl TcpStateMachine {
     log::debug!("[Tcp Machine] connect");
     self.control_signal.send(StateControlSignal::Sync(dest)).map_err(|_| ())
   }
-  pub fn shutdown(&self) -> Result<(), ()> {
-    self.control_signal.send(StateControlSignal::Shutdown).map_err(|_| ())
+
+  pub fn shutdown_read(&self) -> Result<(), ()> {
+    self
+      .control_signal
+      .send(StateControlSignal::ShutdownRead)
+      .map_err(|_| ())
+  }
+
+  pub fn shutdown_write(&self) -> Result<(), ()> {
+    self
+      .control_signal
+      .send(StateControlSignal::ShutdownWrite)
+      .map_err(|_| ())
   }
 }
 
