@@ -124,6 +124,7 @@ impl NatTable {
   }
   /// remove a NAT port mapping
   /// TODO: remove a mapping if no packet send/recv in the last minute.
+  #[allow(unused)]
   fn remove(&mut self, anet_port: u16, inet_port: u16) -> bool {
     if self.find_a2i(anet_port) != Some(inet_port) || self.find_i2a(inet_port) != Some(anet_port) {
       false
@@ -193,16 +194,6 @@ fn icmp_can_pass(icmp: &Icmp) -> bool {
   }
 }
 
-/// Add iptables rules to prevent kernel from terminating TCP connection established by RAW socket
-fn drop_kernel_rst(dport: u16) {
-  // iptables -t filter -I OUTPUT -p tcp --dport 6666 --tcp-flags RST RST -j DROP
-  // See <https://github.com/ermaoCode/raw_socket_connection>
-  std::process::Command::new("iptables")
-    .args(format!("-t filter -I OUTPUT -p tcp --dport {dport} --tcp-flags RST RST -j DROP").split(' '))
-    .spawn()
-    .unwrap();
-}
-
 /// The destination of a packet send to gateway is
 /// - either targeting a node within Athernet,
 /// - or a node in the Internet.
@@ -254,8 +245,6 @@ impl IpLayerGateway {
           // TCP NAT: change source port
           let inet_port = self.nat.find_or_add(tcp.source);
           tcp.source = inet_port;
-          // prevent kernel from terminating the connection
-          drop_kernel_rst(tcp.destination);
           // TCP NAT: change source address
           let ipv4 = compose_tcp(&tcp, self.inet_self_ip, ipv4.destination);
           // compose function should recompute checksum

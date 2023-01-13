@@ -1,7 +1,7 @@
 use super::super::ASockProtocol;
 use super::wrapping_integers::WrappingInt32;
 use crate::IpAccessor;
-use crossbeam_channel::{Receiver, Sender, TryRecvError};
+use crossbeam_channel::{Receiver, Sender};
 use pnet::packet::tcp::{Tcp, TcpFlags};
 use std::{
   net::SocketAddrV4,
@@ -16,6 +16,7 @@ use super::StateControlSignal;
 #[derive(Debug)]
 enum TcpState {
   SynSent,
+  #[allow(unused)]
   SynReceived,
   Established,
   FinWait1,
@@ -228,29 +229,16 @@ impl TcpStateMachineWorker {
       let accessor = IpAccessor::new(&path).unwrap();
       accessor.bind(ASockProtocol::TCP, src_addr).unwrap();
       while control_signal_rx.try_recv().is_err() {
-        // thread::sleep(Duration::from_millis(50));
-        // log::debug!("[Accessor] collect job");
         if let Ok((packet, addr)) = accessor.recv_tcp() {
           log::debug!("[Tcp Accessor] receive tcp from {}", addr);
           packet_received_tx.send((packet, addr)).unwrap();
-          while let Ok(_) = accessor.recv_tcp() {
-            // Eat all remaining tcp packet
+          while accessor.recv_tcp().is_ok() {
+            // Consume all remaining tcp packet
           }
         }
-        match packet_to_send_rx.try_recv() {
-          Ok((packet, addr)) => {
-            // log::debug!("[Tcp Accessor] send tcp to {}", addr);
-            accessor.send_tcp(packet, addr).unwrap();
-            // log::debug!("[Tcp Accessor] send tcp to {} success", addr);
-          }
-          Err(e) => match e {
-            TryRecvError::Empty => (),
-            TryRecvError::Disconnected => {
-              // log::debug!("accessor disconnected");
-            }
-          },
+        if let Ok((packet, addr)) = packet_to_send_rx.try_recv() {
+          accessor.send_tcp(packet, addr).unwrap();
         }
-        // log::debug!("[Accessor] collect job fin");
       }
       log::debug!("[Tcp Accessor] exit");
     });
@@ -632,9 +620,8 @@ impl TcpStateMachineWorker {
     );
     loop {
       self.send_ack();
-      match self.receive_data() {
-        Err(_) => return TcpState::Closed,
-        _ => (),
+      if self.receive_data().is_err() {
+        break TcpState::Closed;
       }
     }
   }
