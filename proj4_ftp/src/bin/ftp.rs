@@ -3,7 +3,8 @@ use std::net::SocketAddrV4;
 
 use proj4_ftp::{
   cli_util::{cmd_prompt, flush_stdout, getline, pick, resp_prompt},
-  ftp_client::{FtpClient, FtpCmd},
+  ftp_client::FtpClient,
+  ftp_cmds::FtpCmd,
 };
 
 use clap::Parser;
