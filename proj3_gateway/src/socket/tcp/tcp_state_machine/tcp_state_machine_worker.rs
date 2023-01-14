@@ -457,17 +457,25 @@ impl TcpStateMachineWorker {
       self.handle_control_signal();
 
       let data_receive_result = self.receive_data();
-      self.send_data();
-      if self.write_down && self.bytes_to_send.is_empty() {
-        return TcpState::FinWait1;
-      }
+
       match data_receive_result {
         Ok(true) => {
           self.recv_seq.as_mut().unwrap().step();
+          self.send_data();
           return TcpState::CloseWait;
         }
-        Ok(false) => retry_times = 0,
-        Err(()) => retry_times += 1,
+        Ok(false) => {
+          retry_times = 0;
+          self.send_data();
+        }
+        Err(_) => {
+          if !self.send_buffer.is_empty() {
+            retry_times += 1;
+          }
+        }
+      }
+      if self.write_down && self.bytes_to_send.is_empty() {
+        return TcpState::FinWait1;
       }
       if retry_times > Self::MAX_RETRY_COUNT {
         return TcpState::Terminate;
@@ -503,7 +511,9 @@ impl TcpStateMachineWorker {
         }
         Err(_) => {
           log::debug!("[Tcp Worker] FinWait1 timeout");
-          retry_count += 1;
+          if !self.send_buffer.is_empty() {
+            retry_count += 1;
+          }
         }
       }
       if retry_count > Self::MAX_RETRY_COUNT {
@@ -527,7 +537,6 @@ impl TcpStateMachineWorker {
       "[Tcp Worker]: \n
     FinWait2"
     );
-    let mut retry_times = 0;
     loop {
       self.send_ack();
       match self.receive_data() {
@@ -535,14 +544,7 @@ impl TcpStateMachineWorker {
           self.recv_seq.as_mut().unwrap().step();
           return TcpState::TimeWait;
         }
-        Ok(false) => retry_times = 0,
-        Err(_) => {
-          self.send_ack();
-          retry_times += 1;
-        }
-      }
-      if retry_times > Self::MAX_RETRY_COUNT {
-        return TcpState::Terminate;
+        _ => (),
       }
     }
   }
@@ -582,7 +584,11 @@ impl TcpStateMachineWorker {
       self.send_data();
       match self.receive_ack() {
         Ok(_) => retry_times = 0,
-        Err(_) => retry_times += 1,
+        Err(_) => {
+          if !self.send_buffer.is_empty() {
+            retry_times += 1;
+          }
+        }
       }
     }
     TcpState::Terminate
@@ -752,6 +758,9 @@ impl TcpStateMachineWorker {
       } else {
         break;
       }
+    }
+    if self.send_buffer.is_empty() {
+      return;
     }
     let packet = self.pack_data(
       self.send_buffer.clone(),
