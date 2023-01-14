@@ -37,18 +37,13 @@ impl ASocket {
 impl Read for ASocket {
   fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
     let (n, fin) = self.0.read_timeout(buf, Some(ASOCK_TIMEOUT));
-    if n > 0 {
-      Ok(n)
-    } else if !fin {
-      Err(Error::new(
-        ErrorKind::Interrupted,
-        "buffer empty, waiting for incoming data".to_string(),
-      ))
-    } else {
+    if n == 0 && fin {
       Err(Error::new(
         ErrorKind::ConnectionAborted,
         "connection cloesd by remote".to_string(),
       ))
+    } else {
+      Ok(n)
     }
   }
 }
