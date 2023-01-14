@@ -458,20 +458,17 @@ impl TcpStateMachineWorker {
       self.handle_control_signal();
 
       let data_receive_result = self.receive_data();
-
+      self.send_data();
       match data_receive_result {
         Ok(true) => {
           self.recv_seq.as_mut().unwrap().step();
-          self.send_data();
           return TcpState::CloseWait;
         }
         Ok(false) => {
           retry_times = 0;
-          self.send_data();
         }
         Err(_) => {
           if !self.send_buffer.is_empty() {
-            self.send_data();
             retry_times += 1;
           }
         }
