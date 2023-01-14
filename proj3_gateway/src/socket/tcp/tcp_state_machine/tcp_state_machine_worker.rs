@@ -395,6 +395,7 @@ impl TcpStateMachineWorker {
           self.send_ack();
           self.reassembler.sync();
           log::debug!("[TCP] worker enter established");
+          self.send_data();
           return TcpState::Established;
         }
       }
