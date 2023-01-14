@@ -815,7 +815,11 @@ impl TcpStateMachineWorker {
       match signal {
         StateControlSignal::ShutdownRead => self.read_down = true,
         StateControlSignal::ShutdownWrite => self.write_down = true,
-        StateControlSignal::Terminate => self.terminating = true,
+        StateControlSignal::Terminate => {
+          self.read_down = true;
+          self.write_down = true;
+          self.terminating = true;
+        }
         _ => (),
       }
     }
