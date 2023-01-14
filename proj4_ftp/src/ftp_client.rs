@@ -15,16 +15,12 @@ fn read_to_end(stream: &mut AnetTcpSocket) -> Vec<u8> {
   let mut buf = [0; BUF_SZ];
   let mut n = 0;
 
-  loop {
-    match stream.read(&mut buf[n..]) {
-      Ok(m) if m > 0 => {
-        n += m;
-      }
-      Err(e) if e.kind() == ErrorKind::Interrupted => {}
-      _ => {
-        break;
-      }
-    };
+  // Athernet TCP read = read with timeout
+  while let Ok(m) = stream.read(&mut buf[n..]) {
+    if m == 0 {
+      break;
+    }
+    n += m;
   }
 
   buf[..n].to_vec()
