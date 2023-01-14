@@ -103,7 +103,7 @@ impl FtpCmd {
   }
   fn parse_cwd(raw_cmd: &str) -> Option<FtpCmdFuzz> {
     let (cmd, dir) = raw_cmd.split_once(" ")?;
-    FtpCmdFuzz::some_new(FtpCmd::PASS(dir.into()), match_metric("CWD", cmd))
+    FtpCmdFuzz::some_new(FtpCmd::CWD(dir.into()), match_metric("CWD", cmd))
   }
   fn parse_list(raw_cmd: &str) -> Option<FtpCmdFuzz> {
     if let Some((cmd, dir)) = raw_cmd.split_once(" ") {
