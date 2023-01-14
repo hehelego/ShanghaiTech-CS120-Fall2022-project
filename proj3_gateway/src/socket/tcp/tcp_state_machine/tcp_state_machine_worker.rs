@@ -758,7 +758,7 @@ impl TcpStateMachineWorker {
         break;
       }
     }
-    if self.send_buffer.is_empty() {
+    if !self.write_down && self.send_buffer.is_empty() {
       return;
     }
     let packet = self.pack_data(
