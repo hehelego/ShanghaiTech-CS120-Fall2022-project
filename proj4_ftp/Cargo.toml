@@ -14,3 +14,4 @@ env_logger = "0.9"
 # others
 rand = "0.8"
 clap = { version = "4.0", features = ["derive"] }
+console = "0.15"
