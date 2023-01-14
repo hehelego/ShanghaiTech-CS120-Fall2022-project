@@ -3,7 +3,7 @@ use std::io::{Error, ErrorKind, Read, Result, Write};
 use std::net::{Shutdown, SocketAddrV4};
 use std::time::Duration;
 
-const ASOCK_TIMEOUT: Duration = Duration::from_millis(800);
+const ASOCK_TIMEOUT: Duration = Duration::from_secs(2);
 const ASOCK_FLUSH_TIME: Duration = Duration::from_millis(50);
 /// Wrapper for Athernet TCP socket, provide Reader/Writer implementation
 pub struct ASocket(TcpStream);
