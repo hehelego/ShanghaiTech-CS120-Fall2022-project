@@ -395,7 +395,7 @@ impl TcpStateMachineWorker {
           self.send_ack();
           self.reassembler.sync();
           log::debug!("[TCP] worker enter established");
-          self.send_data();
+          self.send_data(true);
           return TcpState::Established;
         }
       }
@@ -437,7 +437,7 @@ impl TcpStateMachineWorker {
           self.peer_window_size = packet.window;
           // Get data
           self.update_data(&packet.payload, packet.sequence, packet.flags);
-          self.send_data();
+          self.send_data(true);
           return TcpState::Established;
         }
         retry_count += 1;
@@ -458,19 +458,23 @@ impl TcpStateMachineWorker {
       self.handle_control_signal();
 
       let data_receive_result = self.receive_data();
-      self.send_data();
       match data_receive_result {
         Ok(true) => {
           self.recv_seq.as_mut().unwrap().step();
+          self.send_data(true);
+
           return TcpState::CloseWait;
         }
         Ok(false) => {
+          self.send_data(true);
+
           retry_times = 0;
         }
         Err(_) => {
           if !self.send_buffer.is_empty() {
             retry_times += 1;
           }
+          self.send_data(false);
         }
       }
       if self.write_down && self.bytes_to_send.is_empty() {
@@ -496,7 +500,7 @@ impl TcpStateMachineWorker {
     let mut fin_received = false;
     let mut retry_count = 0;
     while !fin_received && !self.send_buffer.is_empty() {
-      self.send_data();
+      self.send_data(true);
       match self.receive_data() {
         Ok(true) => {
           retry_count = 0;
@@ -556,7 +560,7 @@ impl TcpStateMachineWorker {
     );
     let mut retry_times = 0;
     while !self.send_buffer.is_empty() {
-      self.send_data();
+      self.send_data(true);
       match self.receive_ack() {
         Ok(_) => retry_times = 0,
         Err(_) => retry_times += 1,
@@ -580,7 +584,7 @@ impl TcpStateMachineWorker {
       if (self.write_down && self.bytes_to_send.is_empty()) || self.terminating {
         return TcpState::LastAck;
       }
-      self.send_data();
+      self.send_data(true);
       match self.receive_ack() {
         Ok(_) => retry_times = 0,
         Err(_) => {
@@ -601,7 +605,7 @@ impl TcpStateMachineWorker {
     );
     let mut retry_times = 0;
     while retry_times < Self::MAX_RETRY_COUNT {
-      self.send_data();
+      self.send_data(true);
       match self.receive_ack() {
         Ok(_) => {
           if self.send_buffer.is_empty() {
@@ -749,7 +753,7 @@ impl TcpStateMachineWorker {
     }
   }
 
-  fn send_data(&mut self) {
+  fn send_data(&mut self, ack: bool) {
     // Prepare the data
     while self.send_buffer.len() < self.peer_window_size as usize && self.send_buffer.len() < Self::MAX_DATA_LENGTH {
       if let Ok(byte) = self.bytes_to_send.try_recv() {
@@ -759,6 +763,9 @@ impl TcpStateMachineWorker {
       }
     }
     if !self.write_down && self.send_buffer.is_empty() {
+      if ack {
+        self.send_ack()
+      }
       return;
     }
     let packet = self.pack_data(
