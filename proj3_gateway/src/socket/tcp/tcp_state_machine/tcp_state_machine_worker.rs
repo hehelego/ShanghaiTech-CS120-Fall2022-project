@@ -470,6 +470,7 @@ impl TcpStateMachineWorker {
         }
         Err(_) => {
           if !self.send_buffer.is_empty() {
+            self.send_data();
             retry_times += 1;
           }
         }
