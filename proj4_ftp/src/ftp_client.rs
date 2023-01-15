@@ -117,34 +117,32 @@ impl FtpClient {
   /// (Ftp server response, passive data transmitted, should exit)
   pub fn handle_ftp(&mut self, cmd: FtpCmd) -> FtpHandleResult {
     log::debug!("handling command {:?}", cmd);
+
+    if cmd.is_pasv() && self.pasv_port.is_none() {
+      log::debug!("not in passive mode, run PASV first");
+      self.pasv();
+    }
+
     match cmd.clone() {
       FtpCmd::LIST(_) => {
-        if let Some(mut conn) = self.conn_pasv() {
-          let resp = self.send_ftp_command(cmd);
-          if resp.0 != 150 {
-            return (resp, "".into(), false);
-          }
-          let list = String::from_utf8(read_all(&mut conn)).unwrap();
-          let resp = self.read_response();
-          (resp, list, false)
-        } else {
-          let resp = self.send_ftp_command(cmd);
-          (resp, "".into(), false)
+        let mut conn = self.conn_pasv().unwrap();
+        let resp = self.send_ftp_command(cmd);
+        if resp.0 != 150 {
+          return (resp, "".into(), false);
         }
+        let list = String::from_utf8(read_all(&mut conn)).unwrap();
+        let resp = self.read_response();
+        (resp, list, false)
       }
       FtpCmd::RETR(file) => {
-        if let Some(mut conn) = self.conn_pasv() {
-          let resp = self.send_ftp_command(cmd);
-          if resp.0 != 150 {
-            return (resp, "".into(), false);
-          }
-          std::fs::write(file, read_all(&mut conn)).unwrap();
-          let resp = self.read_response();
-          (resp, "".into(), false)
-        } else {
-          let resp = self.send_ftp_command(cmd);
-          (resp, "".into(), false)
+        let mut conn = self.conn_pasv().unwrap();
+        let resp = self.send_ftp_command(cmd);
+        if resp.0 != 150 {
+          return (resp, "".into(), false);
         }
+        std::fs::write(file, read_all(&mut conn)).unwrap();
+        let resp = self.read_response();
+        (resp, "".into(), false)
       }
       FtpCmd::PASV => {
         let resp = self.pasv();
