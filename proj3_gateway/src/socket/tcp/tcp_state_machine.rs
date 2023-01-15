@@ -90,9 +90,11 @@ impl TcpStateMachine {
 impl Drop for TcpStateMachine {
   // Gracefully shutdown
   fn drop(&mut self) {
+    log::debug!("Tcp State Machine drop...");
     self.control_signal.send(StateControlSignal::Terminate).unwrap();
     if let Some(thread) = self.join_handler.take() {
       thread.join().unwrap();
+      log::debug!("Tcp State Machine worker join.");
     }
   }
 }

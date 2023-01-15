@@ -67,7 +67,7 @@ impl Seq {
       0
     };
     self.absolute_seqence_number += diff;
-    log::debug!(
+    log::trace!(
       "[Seq update]\n
       new_seq: {}, isn: {}, diff: {}, asn: {}",
       new_seq,
@@ -123,7 +123,7 @@ impl Reassembler {
     } else {
       (0, (pos as usize - self.buffer_header))
     };
-    log::debug!(
+    log::trace!(
       "[Reassmbler]: pos: {}, buffer_header: {}, data len: {}, data start:{}, buffer_start: {}",
       pos,
       self.buffer_header,
@@ -155,7 +155,7 @@ impl Reassembler {
       self.is_fin = true;
       drop(self.output.take());
     }
-    log::debug!(
+    log::trace!(
       "[Reassmbler]: Update \n
       data len: {}, byte_reassembled: {}, header_pos: {}, is_fin: {}",
       data.len(),
@@ -817,7 +817,7 @@ impl TcpStateMachineWorker {
     );
     // Update recv seq
     self.recv_seq.as_mut().unwrap().add(ack_delta);
-    log::debug!(
+    log::trace!(
       "Peer seq update: \n
         delat:{}, seq: {}",
       ack_delta,
