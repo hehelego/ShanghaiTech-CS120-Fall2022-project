@@ -34,14 +34,12 @@ fn handle_connection(mut local_stream: TcpStream, local_addr: SocketAddr, fwd_ad
   let mut buf = [0; BUF_SIZE];
 
   // first time interaction: versioning & authentication
-  let n = local_stream.read(&mut buf)?;
-  assert!(n >= 3); // socks5
+  local_stream.read_exact(&mut buf[..3])?;
   assert_eq!(buf[0], 5); // socks5; no auth
-  local_stream.write(&[5, 0])?;
+  local_stream.write_all(&[5, 0])?;
 
   // second time interaction: connect to host. get port number
-  let n = local_stream.read(&mut buf)?;
-  assert_eq!(n, 10);
+  local_stream.read_exact(&mut buf[..10])?;
   assert_eq!(&buf[0..4], &[5, 1, 0, 1]); // socks5; connect to host; reserved 0; ipv4 addr
   let ip = Ipv4Addr::new(buf[4], buf[5], buf[6], buf[7]);
   let port = (buf[8] as u16) << 8 | (buf[9] as u16);
@@ -60,14 +58,14 @@ fn handle_connection(mut local_stream: TcpStream, local_addr: SocketAddr, fwd_ad
       buf[1] = 0;
       buf[4..10].fill(0);
       // socks5; succeeded; reserved 0; ipv4 addr; bind ip; bind port
-      local_stream.write(&buf[..n])?;
+      local_stream.write_all(&buf[..10])?;
     }
     Err(e) => {
       log::debug!("{:?} <-> {:?} connect failed: {:?}", local_addr, remote_addr, e);
       buf[1] = 1;
       buf[4..10].fill(0);
       // socks5; general error; reserved 0; ipv4 addr; bind ip; bind port
-      local_stream.write(&buf[..n])?;
+      local_stream.write_all(&buf[..10])?;
 
       return Err(e);
     }
