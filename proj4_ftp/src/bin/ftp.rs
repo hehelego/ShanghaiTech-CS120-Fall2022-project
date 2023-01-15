@@ -44,7 +44,7 @@ fn main() -> Result<()> {
       println!("{} {}", resp_prompt(format!("resp[{status}]")), resp);
       println!("{passive_data}");
       if should_exit {
-        std::process::exit(0)
+        break Ok(());
       }
     }
   }
