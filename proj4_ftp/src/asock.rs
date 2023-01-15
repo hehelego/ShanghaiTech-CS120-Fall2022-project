@@ -1,7 +1,7 @@
 use proj3_gateway::TcpStream;
 use std::io::{Error, ErrorKind, Read, Result, Write};
 use std::net::{Shutdown, SocketAddrV4};
-use std::rc::Rc;
+use std::sync::Arc;
 use std::time::Duration;
 
 const ASOCK_TIMEOUT: Duration = Duration::from_secs(2);
@@ -9,17 +9,17 @@ const ASOCK_FLUSH_TIME: Duration = Duration::from_millis(50);
 
 /// Wrapper for Athernet TCP socket, provide Reader/Writer implementation
 #[derive(Clone)]
-pub struct ASocket(Rc<TcpStream>);
+pub struct ASocket(Arc<TcpStream>);
 
 impl ASocket {
   pub fn bind(addr: SocketAddrV4) -> Result<ASocket> {
     TcpStream::bind(addr)
-      .map(|sock| ASocket(Rc::new(sock)))
+      .map(|sock| ASocket(Arc::new(sock)))
       .map_err(|_| Error::new(ErrorKind::AddrInUse, "address in use, bind failed".to_string()))
   }
 
   pub fn connect(&mut self, dest: SocketAddrV4) -> Result<()> {
-    Rc::get_mut(&mut self.0)
+    Arc::get_mut(&mut self.0)
       .expect("Athernet Tcp Socket borrow mut")
       .connect(dest)
       .map_err(|_| {
