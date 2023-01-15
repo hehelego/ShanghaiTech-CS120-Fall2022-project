@@ -2,10 +2,6 @@
 mod asock;
 pub use asock::ASocket as AnetTcpSocket;
 
-/// SOCKS5 protocol proxy server that
-/// forwards normal network traffic through Athernet.
-pub mod proxy_server;
-
 /// FTP commands and CLI parser
 pub mod ftp_cmds;
 /// FTP client built on Athernet TCP transport layer.
