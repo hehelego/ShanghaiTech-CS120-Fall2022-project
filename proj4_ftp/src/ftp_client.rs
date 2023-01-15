@@ -168,10 +168,6 @@ impl FtpClient {
 impl Drop for FtpClient {
   fn drop(&mut self) {
     let _ = self.ctrl_stream.shutdown(Shutdown::Both);
-    let mut workers = vec![];
-    std::mem::swap(&mut self.workers, &mut workers);
-    for worker in workers {
-      let _ = worker.join().unwrap();
-    }
+    self.workers.clear();
   }
 }
