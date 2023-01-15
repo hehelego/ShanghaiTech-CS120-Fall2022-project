@@ -1,6 +1,7 @@
 use crate::AnetTcpSocket;
 use std::io::{BufRead, BufReader, Read, Result, Write};
-use std::net::{Ipv4Addr, SocketAddrV4};
+use std::net::{Ipv4Addr, Shutdown, SocketAddrV4};
+use std::thread::{spawn, JoinHandle};
 
 use crate::ftp_cmds::FtpCmd;
 
@@ -23,6 +24,7 @@ pub struct FtpClient {
   ctrl_stream: AnetTcpSocket,
   resp_stream: BufReader<AnetTcpSocket>,
   pasv_port: Option<u16>,
+  workers: Vec<JoinHandle<Result<()>>>,
 }
 impl FtpClient {
   /// get the response from server
@@ -77,6 +79,7 @@ impl FtpClient {
       ctrl_stream: stream.clone(),
       resp_stream: BufReader::new(stream),
       pasv_port: None,
+      workers: vec![],
     };
     log::debug!("connected");
     let welcome = this.read_response();
@@ -128,6 +131,7 @@ impl FtpClient {
         let mut conn = self.conn_pasv().unwrap();
         let resp = self.send_ftp_command(cmd);
         if resp.0 != 150 {
+          self.workers.push(spawn(move || conn.shutdown(Shutdown::Both)));
           return (resp, "".into(), false);
         }
         let list = String::from_utf8(read_all(&mut conn)).unwrap();
@@ -138,6 +142,7 @@ impl FtpClient {
         let mut conn = self.conn_pasv().unwrap();
         let resp = self.send_ftp_command(cmd);
         if resp.0 != 150 {
+          self.workers.push(spawn(move || conn.shutdown(Shutdown::Both)));
           return (resp, "".into(), false);
         }
         std::fs::write(file, read_all(&mut conn)).unwrap();
@@ -156,6 +161,17 @@ impl FtpClient {
         let resp = self.send_ftp_command(cmd);
         (resp, "".into(), false)
       }
+    }
+  }
+}
+
+impl Drop for FtpClient {
+  fn drop(&mut self) {
+    let _ = self.ctrl_stream.shutdown(Shutdown::Both);
+    let mut workers = vec![];
+    std::mem::swap(&mut self.workers, &mut workers);
+    for worker in workers {
+      let _ = worker.join().unwrap();
     }
   }
 }
