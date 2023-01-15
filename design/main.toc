@@ -1,7 +1,0 @@
-\babel@toc {english}{}\relax 
-\contentsline {chapter}{\numberline {1}Acoustic link}{1}{chapter.3}%
-\contentsline {chapter}{\numberline {2}Multiple Access}{2}{chapter.4}%
-\contentsline {chapter}{\numberline {3}Gateway}{3}{chapter.6}%
-\contentsline {chapter}{\numberline {4}FTP}{4}{chapter.7}%
-\contentsline {chapter}{\numberline {5}Discussion}{5}{chapter.8}%
-\contentsline {chapter}{\numberline {6}References}{6}{chapter.9}%

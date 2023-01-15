@@ -1,9 +1,2 @@
 /target
 **.DS_Store
-
-%latex
-*.aux
-*.log
-*.out
-*.pdf
-*.synctex*
