@@ -9,18 +9,18 @@ pub enum ASockProtocol {
   ICMP,
   TCP,
 }
-impl Into<Protocol> for ASockProtocol {
-  fn into(self) -> Protocol {
-    match self {
+impl From<ASockProtocol> for Protocol {
+  fn from(val: ASockProtocol) -> Self {
+    match val {
       ASockProtocol::UDP => Protocol::UDP,
       ASockProtocol::ICMP => Protocol::ICMPV4,
       ASockProtocol::TCP => Protocol::TCP,
     }
   }
 }
-impl Into<IpNextHeaderProtocol> for ASockProtocol {
-  fn into(self) -> IpNextHeaderProtocol {
-    match self {
+impl From<ASockProtocol> for IpNextHeaderProtocol {
+  fn from(val: ASockProtocol) -> Self {
+    match val {
       ASockProtocol::UDP => IpNextHeaderProtocols::Udp,
       ASockProtocol::ICMP => IpNextHeaderProtocols::Icmp,
       ASockProtocol::TCP => IpNextHeaderProtocols::Tcp,

@@ -69,29 +69,29 @@ impl FtpCmd {
   }
 
   fn parse_user(raw_cmd: &str) -> Option<FtpCmdFuzz> {
-    let (cmd, uname) = raw_cmd.split_once(" ")?;
+    let (cmd, uname) = raw_cmd.split_once(' ')?;
     FtpCmdFuzz::some_new(FtpCmd::USER(uname.into()), match_metric("USER", cmd))
   }
   fn parse_pass(raw_cmd: &str) -> Option<FtpCmdFuzz> {
-    if let Some((cmd, pwd)) = raw_cmd.split_once(" ") {
+    if let Some((cmd, pwd)) = raw_cmd.split_once(' ') {
       FtpCmdFuzz::some_new(FtpCmd::PASS(pwd.into()), match_metric("PASS", cmd))
     } else {
       FtpCmdFuzz::some_new(FtpCmd::PASS("".into()), match_metric("PASS", raw_cmd))
     }
   }
   fn parse_cwd(raw_cmd: &str) -> Option<FtpCmdFuzz> {
-    let (cmd, dir) = raw_cmd.split_once(" ")?;
+    let (cmd, dir) = raw_cmd.split_once(' ')?;
     FtpCmdFuzz::some_new(FtpCmd::CWD(dir.into()), match_metric("CWD", cmd))
   }
   fn parse_list(raw_cmd: &str) -> Option<FtpCmdFuzz> {
-    if let Some((cmd, dir)) = raw_cmd.split_once(" ") {
+    if let Some((cmd, dir)) = raw_cmd.split_once(' ') {
       FtpCmdFuzz::some_new(FtpCmd::LIST(dir.into()), match_metric("LIST", cmd))
     } else {
       FtpCmdFuzz::some_new(FtpCmd::LIST("".into()), match_metric("LIST", raw_cmd))
     }
   }
   fn parse_retr(raw_cmd: &str) -> Option<FtpCmdFuzz> {
-    let (cmd, file) = raw_cmd.split_once(" ")?;
+    let (cmd, file) = raw_cmd.split_once(' ')?;
     FtpCmdFuzz::some_new(FtpCmd::RETR(file.to_string()), match_metric("RETR", cmd))
   }
   fn parse_pwd(raw_cmd: &str) -> Option<FtpCmdFuzz> {

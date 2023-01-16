@@ -542,12 +542,9 @@ impl TcpStateMachineWorker {
     );
     loop {
       self.send_ack();
-      match self.receive_data() {
-        Ok(true) => {
-          self.recv_seq.as_mut().unwrap().step();
-          return TcpState::TimeWait;
-        }
-        _ => (),
+      if let Ok(true) = self.receive_data() {
+        self.recv_seq.as_mut().unwrap().step();
+        return TcpState::TimeWait;
       }
     }
   }

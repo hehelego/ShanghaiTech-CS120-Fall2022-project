@@ -39,7 +39,7 @@ impl RawSock {
     let dest = SocketAddrV4::new(ipv4.destination, 0);
     let mut pack = MutableIpv4Packet::new(&mut self.send_buf[..len]).ok_or(ErrorKind::InvalidData)?;
     pack.populate(&ipv4);
-    self.sock.send_to(&pack.packet(), &dest.into())?;
+    self.sock.send_to(pack.packet(), &dest.into())?;
 
     Ok(())
   }

@@ -88,7 +88,7 @@ fn icmp_once() {
     icmp_type: IcmpTypes::EchoReply,
     icmp_code: IcmpCode(rng.gen()),
     checksum: 0,
-    payload: rng.sample_iter(Standard).take(len as usize).collect(),
+    payload: rng.sample_iter(Standard).take(len).collect(),
   };
 
   let src = Ipv4Addr::new(0, 1, 2, 3);

@@ -100,8 +100,8 @@ fn handle_connection(mut local_stream: TcpStream, local_addr: SocketAddr) -> Res
     local_addr,
     remote_addr
   );
-  let _ = fwd_l2r.join().unwrap();
-  let _ = fwd_r2l.join().unwrap();
+  fwd_l2r.join().unwrap();
+  fwd_r2l.join().unwrap();
 
   Ok(())
 }

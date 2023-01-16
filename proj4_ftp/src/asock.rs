@@ -57,7 +57,7 @@ impl Write for ASocket {
   fn write(&mut self, buf: &[u8]) -> Result<usize> {
     self
       .0
-      .write_timeout(&buf, None)
+      .write_timeout(buf, None)
       .map_err(|_| Error::new(ErrorKind::Other, "unknown error".to_string()))
   }
 
