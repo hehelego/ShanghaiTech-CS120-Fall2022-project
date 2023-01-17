@@ -1,6 +1,37 @@
-\section{Network}
-\lipsum[1]
+\section{Network Layer}
+Network layer moves one steps further by enabling data transmission between Athernet and Internet.
+
 \subsection{Internet Protocol}
-\lipsum[7-8]
+On each Athernet node, a daemon process call the IP server constantly receives IP packets targetted to the node and forwards IP packets to peers.
+Processes running on Athernet nodes uses IP accessor which communicates with IP server through datagram oriented unix domain socket to access the network layer services.\par
+
+
+IP server maintains a send queue of IP packets and a reassemble queue of MAC frames.
+It periodically takes one packet out of the queue, split it pieces, wrap them in MAC frames and send them to peers via MAC layer service.
+When a MAC frame is received from peer, IP server append it to the reassemble queue and try to combine the received pieces into an complete IP packet.\par
+
+IP server maintains a set of bind rules where
+a rule is a 3-tuple of a transport layer protocol, a port number and a unix domain socket path.
+When an IP packet is received, IP server run the following procedure:
+\begin{enumerate}
+	\item Inspect the IP destination field.
+	      If the IP destination address is not equal to the IP address of this node, push it to the send queue.
+	      Otherwise, it is a packet targeting the current Athernet node.
+	\item For a packet targeting at current ndoe, extract the next level protocol field and parse the next-level destination port number.
+	\item Try to find a rule that matches the protocol and port number.
+	      If not such rule exists, discard the IP packet.
+		  Otherwise, extract the socket path field and send the entire IP packet to the IP accessor which is bind to the socket path.
+\end{enumerate}\par
+An IP accessor can add or remove a bind rule for the IP server by sending bind or unbind request messages through unix domain socket.
+A process can uses IP accessor to send a send packet request messages through unix domain socket to command the IP server to push a packet to the send queue.
+A process will receive IP packets from the IP server that matches the bind rule.
+
 \subsection{Network address translation}
-\lipsum[9-10]
+A gateway node that is connected to the Internet uses NAT to link Athernet with the Internet.
+It uses IP raw socket to capture all incoming IP packets from the OS TCP/IP stack.\par
+NAT translate a 3-tuple of Athernet IP address, transport protocol and port number to another port number.
+If Athernet internal node sends an IP packet targeting at an Internet host to the gateway,
+the gateway node changes the IP source address to gateway IP address and the next level port number to NAT translated port number.
+After recalculating the checksum, the gateway node forwards the packet out with IP raw socket.
+When the gateway receives an IP packet, it goes through the reverse direction and forwards the translated IP packet to Athernet peers.\par
+By doing so, Athernet internal nodes can communicate with any Internet host.
