@@ -19,7 +19,7 @@ $x_p(t)$ is a linear chirp signal whose lowest and highest instaneous frequency 
 		\pi \dfrac{f_a-f_a}{T} {(t-T)}^2 + 2\pi f_b (t-T) & t\in [T,2T]
 	\end{cases}
 \]
-For 48kHZ sampling frequency, we choose a up-down chirp where $(f_a,f_b)=
+Auto-correlation energy peak detection is used to find the starting position of the preamble signal which is followed by the payload signal.
 
 \subsubsection{Modulation and Demodulation}
 In order to transmit and receive digital signals, a modulation scheme has to be implemented.
@@ -51,3 +51,9 @@ As for cabel-connected scenario, baseband transmission is possible as low freque
 
 \subsection{Medium Access Control sublayer}
 the medium access control layer regulates access to the shared medium and implements error detection and retransmission mechanism.
+
+\subsubsection{Sequence Number and Error Detection}
+
+\subsubsection{Time-division multiplexing MAC}
+
+\subsection{CSMA}
