@@ -56,7 +56,16 @@ As for cabel-connected scenario, baseband transmission is feasible as low freque
 4B5B + non-return to zero inverted(NRZI) enables higher bandwidth and lower error rate.
 
 \subsection{Medium Access Control sublayer}
-\subsubsection{Error Correction}
+The medium access control layer regulates access to the shared medium and implements error detection and retransmission mechanism.
+\begin{figure}[h]
+	\begin{center}
+		\centerline{\includegraphics[scale=0.4]{./figures/macpacket.png}}
+		\caption{the MAC frame}
+		\label{csma}
+	\end{center}
+\end{figure}
+A MAC frame is placed in the payload field of a PHY frame so that it can be sent/received through PHY layer.
+
 \subsubsection{CSMA/CA}
 \begin{figure}[h]
 	\begin{center}
@@ -65,8 +74,14 @@ As for cabel-connected scenario, baseband transmission is feasible as low freque
 		\label{csma}
 	\end{center}
 \end{figure}
-The medium access control layer regulates access to the shared medium and retransmission mechanism. We implemented \emph{Carrier Sense Multiple Access with Collision Avoidance (CSMA/CA)}. Each device will listen to the channel before transmitting. If the channel is busy, the device will wait for a random time and then try to resend the data. The time is chosen by the exponential backoff algorithm. The state transition diagram is shown in Figure~\ref{csma}
+We implemented \emph{Carrier Sense Multiple Access with Collision Avoidance (CSMA/CA)}. Each device will listen to the channel before transmitting. If the channel is busy, the device will wait for a random time and then try to resend the data. The time is chosen by the exponential backoff algorithm. The state transition diagram is shown in Figure~\ref{csma}
+
+
+\subsubsection{Sequence Number and Error Detection}
+The sequence number and CRC checksum fields are used to drop out-of-order packets and corrupted packets.
+A sliding window transmission control is implemented to provide reliable in-order data transmission.
+
+\subsubsection{Round Robin MAC}
 
 \subsubsection{Time-division multiplexing MAC}
-Due to the latency of the audio driver, the original CSMA/CA suffers from the remote collision. We also implemented Time-division multiplexing MAC.
 
