@@ -50,10 +50,17 @@ As for cabel-connected scenario, baseband transmission is possible as low freque
 \subsubsection{Frame Detection}
 
 \subsection{Medium Access Control sublayer}
-the medium access control layer regulates access to the shared medium and implements error detection and retransmission mechanism.
-
-\subsubsection{Sequence Number and Error Detection}
+\subsubsection{CSMA/CA}
+\begin{figure}[h]
+	\begin{center}
+		\centerline{\includegraphics[width=\columnwidth]{./figures/CSMA.png}}
+		\caption{the CSMA/CA procdcure}
+		\label{csma}
+	\end{center}
+\end{figure}
+The medium access control layer regulates access to the shared medium and retransmission mechanism. Each device will listen to the channel before transmitting. If the channel is busy, the device will wait for a random time and then try to resend the data. The time is chosen by the exponential backoff algorithm. The state transition diagram is shown in Figure~\ref{csma}
 
 \subsubsection{Time-division multiplexing MAC}
+Due to the latency of the audio driver, the original CSMA/CA suffers from the remote collision. We also implemented Time-division multiplexing MAC.
 
 \subsection{CSMA}
