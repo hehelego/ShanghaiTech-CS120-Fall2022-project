@@ -4,6 +4,13 @@ provides reliable bidirectional packet transmission between two nodes in a share
 The data link layer consists of the physics sublayer and the medium access control sublayer.
 
 \subsection{Physics Sublayer (PHY)}
+\begin{figure}[h]
+	\begin{center}
+		\centerline{\includegraphics[width=\columnwidth]{./figures/Phylayer.png}}
+		\caption{the physics layer}
+		\label{physics}
+	\end{center}
+\end{figure}
 Bulit on the audio I/O library, PHY enables basic data transmission with no delivery or integrity guarantee.
 A PHY frame is a sequence of PCM audio signal samples that represents a chunk of bytes. It is the transmission unit on this layer.
 Each frame contains a fixed preamble signal at the beginning for detection as well as synchronization and a payload signal that encodes 0/1 bits.\par
@@ -46,9 +53,10 @@ However, unlike radio medium, transmitting real part and imaginary part of a com
 so only half of the frequency channels can be used to encode bits.
 Also, several channels of extremely low and high frequency are not usable as background noise is too strong.\par
 As for cabel-connected scenario, baseband transmission is feasible as low frequency background noise no longer exists.
-4B5B + NRZI enables higher bandwidth and lower error rate.
+4B5B + non-return to zero inverted(NRZI) enables higher bandwidth and lower error rate.
 
 \subsection{Medium Access Control sublayer}
+\subsubsection{Error Correction}
 \subsubsection{CSMA/CA}
 \begin{figure}[h]
 	\begin{center}
@@ -57,9 +65,8 @@ As for cabel-connected scenario, baseband transmission is feasible as low freque
 		\label{csma}
 	\end{center}
 \end{figure}
-The medium access control layer regulates access to the shared medium and retransmission mechanism. Each device will listen to the channel before transmitting. If the channel is busy, the device will wait for a random time and then try to resend the data. The time is chosen by the exponential backoff algorithm. The state transition diagram is shown in Figure~\ref{csma}
+The medium access control layer regulates access to the shared medium and retransmission mechanism. We implemented \emph{Carrier Sense Multiple Access with Collision Avoidance (CSMA/CA)}. Each device will listen to the channel before transmitting. If the channel is busy, the device will wait for a random time and then try to resend the data. The time is chosen by the exponential backoff algorithm. The state transition diagram is shown in Figure~\ref{csma}
 
 \subsubsection{Time-division multiplexing MAC}
 Due to the latency of the audio driver, the original CSMA/CA suffers from the remote collision. We also implemented Time-division multiplexing MAC.
 
-\subsection{CSMA}
