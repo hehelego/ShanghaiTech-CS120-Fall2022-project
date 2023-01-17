@@ -49,9 +49,23 @@ As for cabel-connected scenario, baseband transmission is feasible as low freque
 4B5B + NRZI enables higher bandwidth and lower error rate.
 
 \subsection{Medium Access Control sublayer}
-the medium access control layer regulates access to the shared medium and implements error detection and retransmission mechanism.
+The medium access control layer regulates access to the shared medium and implements error detection and retransmission mechanism.
+A MAC frame contains the following fields:
+\begin{itemize}
+	\item Sender MAC address.
+	\item Receiver MAC address.
+	\item Sender frame sequence number.
+	\item Acknowledged frame sequence number.
+	\item CRC checksum.
+	\item Payload.
+\end{itemize}
+A MAC frame is placed in the payload field of a PHY frame so that it can be sent/received through PHY layer.
 
 \subsubsection{Sequence Number and Error Detection}
+The sequence number and CRC checksum fields are used to drop out-of-order packets and corrupted packets.
+A sliding window transmission control is implemented to provide reliable in-order data transmission.
+
+\subsubsection{Round Robin MAC}
 
 \subsubsection{Time-division multiplexing MAC}
 
