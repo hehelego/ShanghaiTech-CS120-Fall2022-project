@@ -67,7 +67,7 @@ impl Seq {
       0
     };
     self.absolute_seqence_number += diff;
-    log::debug!(
+    log::trace!(
       "[Seq update]\n
       new_seq: {}, isn: {}, diff: {}, asn: {}",
       new_seq,
@@ -123,7 +123,7 @@ impl Reassembler {
     } else {
       (0, (pos as usize - self.buffer_header))
     };
-    log::debug!(
+    log::trace!(
       "[Reassmbler]: pos: {}, buffer_header: {}, data len: {}, data start:{}, buffer_start: {}",
       pos,
       self.buffer_header,
@@ -155,7 +155,7 @@ impl Reassembler {
       self.is_fin = true;
       drop(self.output.take());
     }
-    log::debug!(
+    log::trace!(
       "[Reassmbler]: Update \n
       data len: {}, byte_reassembled: {}, header_pos: {}, is_fin: {}",
       data.len(),
@@ -395,6 +395,7 @@ impl TcpStateMachineWorker {
           self.send_ack();
           self.reassembler.sync();
           log::debug!("[TCP] worker enter established");
+          self.send_data(true);
           return TcpState::Established;
         }
       }
@@ -436,7 +437,7 @@ impl TcpStateMachineWorker {
           self.peer_window_size = packet.window;
           // Get data
           self.update_data(&packet.payload, packet.sequence, packet.flags);
-          self.send_data();
+          self.send_data(true);
           return TcpState::Established;
         }
         retry_count += 1;
@@ -457,17 +458,27 @@ impl TcpStateMachineWorker {
       self.handle_control_signal();
 
       let data_receive_result = self.receive_data();
-      self.send_data();
-      if self.write_down && self.bytes_to_send.is_empty() {
-        return TcpState::FinWait1;
-      }
       match data_receive_result {
         Ok(true) => {
           self.recv_seq.as_mut().unwrap().step();
+          self.send_data(true);
+
           return TcpState::CloseWait;
         }
-        Ok(false) => retry_times = 0,
-        Err(()) => retry_times += 1,
+        Ok(false) => {
+          self.send_data(true);
+
+          retry_times = 0;
+        }
+        Err(_) => {
+          if !self.send_buffer.is_empty() {
+            retry_times += 1;
+          }
+          self.send_data(false);
+        }
+      }
+      if self.write_down && self.bytes_to_send.is_empty() {
+        return TcpState::FinWait1;
       }
       if retry_times > Self::MAX_RETRY_COUNT {
         return TcpState::Terminate;
@@ -489,7 +500,7 @@ impl TcpStateMachineWorker {
     let mut fin_received = false;
     let mut retry_count = 0;
     while !fin_received && !self.send_buffer.is_empty() {
-      self.send_data();
+      self.send_data(true);
       match self.receive_data() {
         Ok(true) => {
           retry_count = 0;
@@ -503,7 +514,9 @@ impl TcpStateMachineWorker {
         }
         Err(_) => {
           log::debug!("[Tcp Worker] FinWait1 timeout");
-          retry_count += 1;
+          if !self.send_buffer.is_empty() {
+            retry_count += 1;
+          }
         }
       }
       if retry_count > Self::MAX_RETRY_COUNT {
@@ -527,22 +540,11 @@ impl TcpStateMachineWorker {
       "[Tcp Worker]: \n
     FinWait2"
     );
-    let mut retry_times = 0;
     loop {
       self.send_ack();
-      match self.receive_data() {
-        Ok(true) => {
-          self.recv_seq.as_mut().unwrap().step();
-          return TcpState::TimeWait;
-        }
-        Ok(false) => retry_times = 0,
-        Err(_) => {
-          self.send_ack();
-          retry_times += 1;
-        }
-      }
-      if retry_times > Self::MAX_RETRY_COUNT {
-        return TcpState::Terminate;
+      if let Ok(true) = self.receive_data() {
+        self.recv_seq.as_mut().unwrap().step();
+        return TcpState::TimeWait;
       }
     }
   }
@@ -555,7 +557,7 @@ impl TcpStateMachineWorker {
     );
     let mut retry_times = 0;
     while !self.send_buffer.is_empty() {
-      self.send_data();
+      self.send_data(true);
       match self.receive_ack() {
         Ok(_) => retry_times = 0,
         Err(_) => retry_times += 1,
@@ -579,10 +581,14 @@ impl TcpStateMachineWorker {
       if (self.write_down && self.bytes_to_send.is_empty()) || self.terminating {
         return TcpState::LastAck;
       }
-      self.send_data();
+      self.send_data(true);
       match self.receive_ack() {
         Ok(_) => retry_times = 0,
-        Err(_) => retry_times += 1,
+        Err(_) => {
+          if !self.send_buffer.is_empty() {
+            retry_times += 1;
+          }
+        }
       }
     }
     TcpState::Terminate
@@ -596,7 +602,7 @@ impl TcpStateMachineWorker {
     );
     let mut retry_times = 0;
     while retry_times < Self::MAX_RETRY_COUNT {
-      self.send_data();
+      self.send_data(true);
       match self.receive_ack() {
         Ok(_) => {
           if self.send_buffer.is_empty() {
@@ -744,7 +750,7 @@ impl TcpStateMachineWorker {
     }
   }
 
-  fn send_data(&mut self) {
+  fn send_data(&mut self, ack: bool) {
     // Prepare the data
     while self.send_buffer.len() < self.peer_window_size as usize && self.send_buffer.len() < Self::MAX_DATA_LENGTH {
       if let Ok(byte) = self.bytes_to_send.try_recv() {
@@ -752,6 +758,12 @@ impl TcpStateMachineWorker {
       } else {
         break;
       }
+    }
+    if !self.write_down && self.send_buffer.is_empty() {
+      if ack {
+        self.send_ack()
+      }
+      return;
     }
     let packet = self.pack_data(
       self.send_buffer.clone(),
@@ -802,7 +814,7 @@ impl TcpStateMachineWorker {
     );
     // Update recv seq
     self.recv_seq.as_mut().unwrap().add(ack_delta);
-    log::debug!(
+    log::trace!(
       "Peer seq update: \n
         delat:{}, seq: {}",
       ack_delta,
@@ -815,7 +827,11 @@ impl TcpStateMachineWorker {
       match signal {
         StateControlSignal::ShutdownRead => self.read_down = true,
         StateControlSignal::ShutdownWrite => self.write_down = true,
-        StateControlSignal::Terminate => self.terminating = true,
+        StateControlSignal::Terminate => {
+          self.read_down = true;
+          self.write_down = true;
+          self.terminating = true;
+        }
         _ => (),
       }
     }

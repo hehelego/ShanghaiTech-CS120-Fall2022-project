@@ -6,3 +6,12 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+# athernet transport layer
+proj3_gateway = { path = "../proj3_gateway/" }
+# logging
+log = "0.4"
+env_logger = "0.9"
+# others
+rand = "0.8"
+clap = { version = "4.0", features = ["derive"] }
+console = "0.15"

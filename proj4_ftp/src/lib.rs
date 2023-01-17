@@ -1,14 +1,15 @@
-pub fn add(left: usize, right: usize) -> usize {
-  left + right
-}
+/// Wrap of Athernet TCP socket
+mod asock;
+pub use asock::ASocket as AnetTcpSocket;
+
+/// FTP commands and CLI parser
+pub mod ftp_cmds;
+/// FTP client built on Athernet TCP transport layer.
+pub mod ftp_client;
+
+/// Utilities for CLI, console text style
+pub mod cli_util;
+
 
 #[cfg(test)]
-mod tests {
-  use super::*;
-
-  #[test]
-  fn it_works() {
-    let result = add(2, 2);
-    assert_eq!(result, 4);
-  }
-}
+mod tests;
