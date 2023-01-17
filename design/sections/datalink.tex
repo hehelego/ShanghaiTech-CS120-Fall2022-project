@@ -76,12 +76,10 @@ A MAC frame is placed in the payload field of a PHY frame so that it can be sent
 \end{figure}
 We implemented \emph{Carrier Sense Multiple Access with Collision Avoidance (CSMA/CA)}. Each device will listen to the channel before transmitting. If the channel is busy, the device will wait for a random time and then try to resend the data. The time is chosen by the exponential backoff algorithm. The state transition diagram is shown in Figure~\ref{csma}
 
+\subsubsection{Time-division multiplexing MAC}
+Due to the latency of the audio driver, the original CSMA/CA suffers from the remote collision. We also implemented Time-division multiplexing MAC., which allocates a fixed time slot for the device to send and receive the packets. We can use the pre-existing Network Time Protocol to synchronize the time of local nodes.
 
 \subsubsection{Sequence Number and Error Detection}
 The sequence number and CRC checksum fields are used to drop out-of-order packets and corrupted packets.
 A sliding window transmission control is implemented to provide reliable in-order data transmission.
-
-\subsubsection{Round Robin MAC}
-
-\subsubsection{Time-division multiplexing MAC}
 
