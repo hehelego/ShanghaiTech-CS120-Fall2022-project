@@ -133,7 +133,7 @@
 \pagestyle{empty}
 
 
-\flushbottom \twocolumn \sloppy
+\flushbottom \sloppy
 
 % We're never going to need a table of contents, so just flush it to
 % save space --- suggested by drstrip@sandia-2
@@ -144,7 +144,7 @@
  \begingroup
    \def\thefootnote{\fnsymbol{footnote}}
    \def\@makefnmark{\hbox to 0pt{$^{\@thefnmark}$\hss}}
-   \twocolumn[\@maketitle] \@thanks
+   \@maketitle \@thanks
  \endgroup
  \setcounter{footnote}{0}
  \let\maketitle\relax \let\@maketitle\relax
