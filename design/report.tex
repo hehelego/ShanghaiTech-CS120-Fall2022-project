@@ -1,0 +1,75 @@
+% File SDSS2020_SampleExtendedAbstract.tex
+\documentclass[10pt]{article}
+\usepackage{sdss2020} % Uses Times Roman font (either newtx or times package)
+\usepackage{url}
+\usepackage{latexsym}
+\usepackage{amsmath, amsthm, amsfonts}
+\usepackage{algorithm, algorithmic}  
+\usepackage{graphicx}
+\usepackage{lipsum}
+\usepackage{enumerate}
+\usepackage{indentfirst}
+\title{Athernet: Acoustic-based User Space Network Stack} 
+
+\author{
+  Cheng Peng \\
+   ShanghaiTech University   \\
+  {\tt pengcheng2@shanghaitech.edu.cn} \\\And
+ Huizhe Su \\
+   ShanghaiTech University  \\
+  {\tt suhzh@shanghaitech.edu.cn} \\}
+  
+
+\date{\today}
+
+\begin{document}
+\maketitle
+\begin{abstract}
+  Athernet is a user-space TCP/IP stack with full functionality and handy utilities built on the acoustic channel. This report describes the main architecture design and the technical implementation of the Athernet.
+\end{abstract}
+
+{\bf Keywords:} network stack, acoustic link, network protocol
+\input{sections/introduction}
+
+\input{sections/datalink}
+
+\input{sections/network}
+
+\input{sections/transport}
+
+\input{sections/application}
+
+\input{sections/conclusion}
+
+\section*{Acknowledgement}
+We would like to express our sincere gratitude to our course teacher Zhice Yang, for providing the knowledge and guidance to complete this project. We would also like to thank our colleagues, Wenchao Li and Jiajun Cheng. Their valuable feedback, suggestions, and support have been instrumental in completing this project.
+
+We would also like to thank the Rust community for providing us with the resources, libraries and platform to develop this project. In completing this project, we used the following libraries (listed in alphabetical order):
+\begin{itemize}
+  \item az: Casts and checked casts.
+  \item bitvec: Addresses memory by bits, for packed collections and bitfields
+  \item clap: A simple to use, efficient, and full-featured Command Line Argument Parser.
+  \item crc: Rust implementation of CRC(16,32,64) with support for various standards.
+  \item crossbeam: Tools for concurrent programming.
+  \item crossbeam-channel: Multi-producer multi-consumer channels for message passing.
+  \item cordic: Special functions for fixed-point numbers using the CORDIC method.
+  \item console: A terminal and console abstraction for Rust.
+  \item cpal: A low-level cross-platform audio I/O library.
+  \item fixed: Fixed-point numbers.
+  \item hound: A wave encoding and decoding library.
+  \item log: A lightweight logging facade for Rust.
+  \item env\_logger: A logging implementation for log which is configured via an environment variable.
+  \item parking\_lot: More compact and efficient implementations of the standard synchronization primitives
+  \item pnet: Cross-platform, low level networking using the Rust programming language.
+  \item postcard: A no\_std + serde compatible message library for Rust.
+  \item rand: Random number generators and other randomness functionality.
+  \item reed-solomon-erasure: Rust implementation of Reed-Solomon erasure coding.
+  \item rustfft: High-performance FFT library written in pure Rust.
+  \item serde: A generic serialization/deserialization framework
+  \item socket2:Utilities for handling networking sockets with a maximal amount of configuration possible intended.
+\end{itemize}
+We have great respect for their developers and maintainers.
+% \bibliographystyle{sdss2020} % Please do not change the bibliography style
+% \bibliography{reference}
+
+\end{document}
